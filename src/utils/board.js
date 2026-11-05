@@ -2,13 +2,12 @@ import {
   CARD_TYPES,
   VISIBILITY,
 } from "./constants.js";
-import { gameState } from "../engine.js";
 
-function getCardDescription(card, player) {
+function getCardDescription(state, card, player) {
     if (!card) return "[EMPTY]";
 
     if (card.getVisibility() === VISIBILITY.FACE_DOWN) {
-        return `[SET CARD] ${player === gameState.currentTurnPlayer ? card.getName() : ""}`;
+        return `[SET CARD] ${player === state.currentTurnPlayer ? card.getName() : ""}`;
     }
 
     if (card.getType() === CARD_TYPES.MONSTER) {
@@ -18,7 +17,8 @@ function getCardDescription(card, player) {
     return card.getName();
 }
 
-function showPlayerStatus(player, playerName, playerState) {
+function showPlayerStatus(state, actualPlayer, playerName, playerState) {
+    let player = state[actualPlayer]
     console.log(`\n========== ${playerName} ==========`)
     console.log(`LP: ${player.lp}`)
     console.log(`Deck: ${player.deck.length}`)
@@ -27,20 +27,20 @@ function showPlayerStatus(player, playerName, playerState) {
     console.log("\nMONSTER ZONE")
 
     player.monsters.forEach((monster, index) => {
-        console.log(`${index + 1}. ${getCardDescription(monster, playerState)}`);
+        console.log(`${index + 1}. ${getCardDescription(state, monster, playerState)}`);
     });
 
     console.log("\nSPELL / TRAP ZONE");
 
     player.supports.forEach((support, index) => {
-        console.log(`${index + 1}. ${getCardDescription(support, playerState)}`);
+        console.log(`${index + 1}. ${getCardDescription(state, support, playerState)}`);
     });
 }
 
-export function showBoard() {
-    let opponent = gameState.currentTurnPlayer === "p1" ? "p2" : "p1"
-    let player   = gameState.currentTurnPlayer
-    console.log(`========== TURN ${gameState.turn} ==========`)
-    showPlayerStatus(gameState[opponent], "OPPONENT", opponent);
-    showPlayerStatus(gameState[player], "YOUR FIELD", player);
+export function showBoard(state) {
+    let opponent = state.currentTurnPlayer === "p1" ? "p2" : "p1"
+    let player   = state.currentTurnPlayer
+    console.log(`========== TURN ${state.turn} ==========`)
+    showPlayerStatus(state, opponent, "OPPONENT", opponent);
+    showPlayerStatus(state, player, "YOUR FIELD", player);
 }
