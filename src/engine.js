@@ -92,6 +92,9 @@ export function handlePhase(state) {
 
 export function normalSummon(state, player, handIndex) {
   const card = state[player].hand[handIndex];
+  if (state[player].normalSummoned) {
+    return { ok: false, message: "You already normal summoned this turn." };
+  }
   if (!card || card.getType() !== CARD_TYPES.MONSTER) {
     return { ok: false, message: "Only monster cards can be summoned." };
   }
@@ -110,6 +113,9 @@ export function setCard(state, player, handIndex) {
   if (!card) return { ok: false, message: "Choose a card from your hand." };
 
   if (card.getType() === CARD_TYPES.MONSTER) {
+    if (state[player].normalSummoned) {
+      return { ok: false, message: "You already normal summoned this turn." };
+    }
     card.setPosition(POSITIONS.DEFENSE);
     card.setVisibility(VISIBILITY.FACE_DOWN);
     card.setZone(ZONES.MONSTER_ZONE);

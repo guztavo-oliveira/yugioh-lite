@@ -1,75 +1,28 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yu-gi-oh Lite</title>
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js"></script>
-</head>
-<body>
-    <script src="src/main.js" type="module"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Yu-Gi-Oh! Lite</title>
+    <style>
+      body {
+        align-items: center;
+        background: #111827;
+        color: #f8fafc;
+        display: flex;
+        font-family: Arial, sans-serif;
+        justify-content: center;
+        margin: 0;
+        min-height: 100vh;
+      }
+
+      #game {
+        box-shadow: 0 16px 48px rgb(0 0 0 / 45%);
+      }
+    </style>
+  </head>
+  <body>
+    <div id="game"></div>
+    <script type="module" src="/src/phaser/main.js"></script>
+  </body>
 </html>
-
-/*
-// class GameScene extends Phaser.Scene {
-//   constructor() {
-//     super({ key: 'GameScene' });
-//   }
-
-//   preload() {
-//     // Make sure 'assets/la_jinn.webp' and 'assets/card_back.webp' exist in your project folder!
-//     this.load.image("la_jinn", "assets/la_jinn.webp");
-//     this.load.image("card_back", "assets/card_back.webp");
-//   }
-
-//   create() {
-//     // 1. Create a visible background board box
-//     const graphics = this.add.graphics();
-//     graphics.lineStyle(2, 0x00ff00, 1); // Green border for drop zones
-
-//     // 2. Render 5 monster slot boxes (Both the visual outline AND the invisible zone)
-//     this.monsterSlots = [];
-//     for (let i = 0; i < 5; i++) {
-//       let x = 400 + (i * 120);
-//       let y = 350;
-
-//       // Draw visible outline box
-//       graphics.strokeRect(x - 50, y - 70, 100, 140);
-
-//       // Create invisible drop zone on top of the drawn box
-//       let zone = this.add.zone(x, y, 100, 140).setRectangleDropZone(100, 140);
-//       zone.slotIndex = i;
-//       this.monsterSlots.push(zone);
-
-//       // Add slot index label
-//       this.add.text(x, y, `Zone ${i + 1}`, { fontSize: '14px', color: '#555555' }).setOrigin(0.5);
-//     }
-
-//     // 3. Render loaded card images directly onto the canvas
-//     // Display Deck (card back image)
-//     this.add.image(1100, 550, "card_back").setDisplaySize(100, 140);
-//     this.add.text(1100, 630, "DECK", { fontSize: '16px', color: '#ffffff' }).setOrigin(0.5);
-
-//     // Display a test card in the hand position
-//     const laJinnCard = this.add.image(640, 600, "la_jinn").setDisplaySize(100, 140);
-//     this.add.text(640, 680, "La Jinn (Hand)", { fontSize: '14px', color: '#ffffff' }).setOrigin(0.5);
-//   }
-// }
-
-// const config = {
-//   type: Phaser.AUTO,
-//   width: 1280,
-//   height: 720,
-//   backgroundColor: '#1b1b1b', // Kept dark background so white text is visible
-//   scene: [GameScene]
-// };
-
-// const game = new Phaser.Game(config);
-
-// while(gameState.p1.lp > 0 || gameState.p2.lp > 0){
-
-// }
-
-
-*/
