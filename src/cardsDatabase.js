@@ -69,7 +69,7 @@ export const CARD_DATABASE = {
     atk: 800,
     def: 2000,
     level: 4,
-    imgKey: "mystic_elf"
+    imgKey: "mystical_elf"
   },
 
   // ===== SPELLS =====

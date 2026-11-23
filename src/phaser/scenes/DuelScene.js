@@ -21,6 +21,19 @@ const CARD_GAP = 28;
 const CARD_TEXTURES = {
   "Blue-Eyes White Dragon": "blue-eyes",
   "La Jinn the Mystical Genie of the Lamp": "la-jinn",
+  "Dark Magician": "dark_magician",
+  "Summoned Skull": "summoned_skull",
+  "Darkfire Soldier #1": "darkfire_soldier_1",
+  "Feral Imp": "feral_imp",
+  "Mystic Elf": "mystical_elf",
+  "Dark Hole": "dark_hole",
+  "Monster Reborn": "monster_reborn",
+  "Raigeki": "raigeki",
+  "Pot of Greed": "pot_of_greed",
+  "Trap Hole": "trap_hole",
+  "Mirror Force": "mirror_force",
+  "Magic Cylinder": "magic_cylinder",
+  "Torrential Tribute": "torrential_tribute"
 };
 
 export class DuelScene extends Phaser.Scene {
