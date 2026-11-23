@@ -17,6 +17,7 @@ export function createGameState() {
     currentTurnPlayer: "p1",
     phase: DUEL_PHASES.DRAW,
     turn: 1,
+    log: [],
     p1: {
       lp: 8000,
       deck: ["c001", "c002", "c003", "c006", "c007", "c008", "c009", "c010", "c011", "c012", "c013", "c014", "c015"],
@@ -31,6 +32,15 @@ export function createGameState() {
 }
 
 export const gameState = createGameState();
+
+function getPlayerLabel(player) {
+  return player === "p1" ? "Player 1" : "Player 2";
+}
+
+export function addGameLog(state, message) {
+  state.log.push(message);
+  if (state.log.length > 30) state.log.shift();
+}
 
 export function getOpponent(player) {
   return player === "p1" ? "p2" : "p1";
@@ -77,6 +87,11 @@ function getMonsterIndex(state, player, monster) {
   return state[player].monsters.findIndex((fieldMonster) => fieldMonster === monster);
 }
 
+function completeBattle(state, message) {
+  addGameLog(state, message);
+  return { ok: true, message };
+}
+
 function isEligibleTrap(card, state, player, event) {
   if (
     card.getType() !== CARD_TYPES.TRAP
@@ -116,6 +131,7 @@ export function drawStartingHand(state, player) {
 export function startDuel(state) {
   drawStartingHand(state, "p1");
   drawStartingHand(state, "p2");
+  addGameLog(state, "The duel started.");
 }
 
 export function advancePhase(state) {
@@ -127,6 +143,8 @@ export function advancePhase(state) {
     state.phase = DUEL_PHASES_FLOW[0];
     state.currentTurnPlayer = getOpponent(player);
     state.turn++;
+    addGameLog(state, `${getPlayerLabel(player)} ended their turn.`);
+    addGameLog(state, `Turn ${state.turn}: ${getPlayerLabel(state.currentTurnPlayer)} begins.`);
     return;
   }
 
@@ -136,6 +154,7 @@ export function advancePhase(state) {
 export function handlePhase(state) {
   if (state.phase === DUEL_PHASES.DRAW) {
     drawCard(state, state.currentTurnPlayer);
+    addGameLog(state, `${getPlayerLabel(state.currentTurnPlayer)} drew a card.`);
     advancePhase(state);
   }
 }
@@ -155,6 +174,7 @@ export function normalSummon(state, player, handIndex) {
   state[player].monsters.push(card);
   state[player].normalSummoned = true;
   moveCardFromHand(state, player, handIndex);
+  addGameLog(state, `${getPlayerLabel(player)} Normal Summoned ${card.getName()}.`);
   return {
     ok: true,
     message: `Summoning ${card.getName()}...`,
@@ -173,9 +193,11 @@ export function setCard(state, player, handIndex) {
     card.setPosition(POSITIONS.DEFENSE);
     card.setVisibility(VISIBILITY.FACE_DOWN);
     card.setZone(ZONES.MONSTER_ZONE);
+    card.markSet(state.turn);
     state[player].monsters.push(card);
     state[player].normalSummoned = true;
     moveCardFromHand(state, player, handIndex);
+    addGameLog(state, `${getPlayerLabel(player)} set a monster.`);
     return { ok: true, message: `Setting ${card.getName()} face down in defense position.` };
   }
 
@@ -184,7 +206,28 @@ export function setCard(state, player, handIndex) {
   if (card.getType() === CARD_TYPES.TRAP) card.markSet(state.turn);
   state[player].supports.push(card);
   moveCardFromHand(state, player, handIndex);
+  addGameLog(state, `${getPlayerLabel(player)} set a Spell/Trap card.`);
   return { ok: true, message: `Setting ${card.getName()} face down.` };
+}
+
+export function flipSummon(state, player, monsterIndex) {
+  const monster = state[player]?.monsters[monsterIndex];
+  if (!isMainPhase(state.phase)) {
+    return { ok: false, message: "Flip Summons can only be performed during a Main Phase." };
+  }
+  if (
+    !monster
+    || monster.getVisibility() !== VISIBILITY.FACE_DOWN
+    || monster.getPosition() !== POSITIONS.DEFENSE
+    || monster.getSetTurn() >= state.turn
+  ) {
+    return { ok: false, message: "Choose a face-down monster in Defense Position." };
+  }
+
+  monster.setVisibility(VISIBILITY.FACE_UP);
+  monster.setPosition(POSITIONS.ATTACK);
+  addGameLog(state, `${getPlayerLabel(player)} Flip Summoned ${monster.getName()}.`);
+  return { ok: true, message: `${monster.getName()} was Flip Summoned.` };
 }
 
 export function activateSpell(state, player, handIndex) {
@@ -204,6 +247,7 @@ export function activateSpell(state, player, handIndex) {
   card.setZone(ZONES.SUPPORT_ZONE);
   state[player].supports.push(card);
   moveCardFromHand(state, player, handIndex);
+  addGameLog(state, `${getPlayerLabel(player)} activated ${card.getName()}.`);
   return {
     ok: true,
     message: `${card.getName()} was activated.`,
@@ -224,6 +268,7 @@ export function activateSetSpell(state, player, supportIndex) {
   }
 
   card.setVisibility(VISIBILITY.FACE_UP);
+  addGameLog(state, `${getPlayerLabel(player)} activated ${card.getName()}.`);
   return { ok: true, message: `${card.getName()} was activated.`, supportIndex };
 }
 
@@ -272,6 +317,7 @@ export function resolveSpell(state, player, supportIndex, target = null) {
   }
 
   sendSupportToGraveyard(state, player, supportIndex);
+  addGameLog(state, `${card.getName()} resolved.`);
   return { ok: true, message: `${card.getName()} resolved.` };
 }
 
@@ -290,6 +336,7 @@ export function activateTrap(state, player, supportIndex, event) {
   }
 
   card.setVisibility(VISIBILITY.FACE_UP);
+  addGameLog(state, `${getPlayerLabel(player)} activated ${card.getName()}.`);
   return { ok: true, message: `${card.getName()} was activated.`, supportIndex };
 }
 
@@ -337,6 +384,7 @@ export function resolveTrap(state, player, supportIndex, event) {
   }
 
   sendSupportToGraveyard(state, player, supportIndex);
+  addGameLog(state, `${card.getName()} resolved.`);
   return result;
 }
 
@@ -356,6 +404,7 @@ export function declareAttack(state, player, attackerIndex, targetIndex) {
   }
 
   attacker.setAlreadyAttacked();
+  addGameLog(state, `${getPlayerLabel(player)} declared an attack with ${attacker.getName()}.`);
   return {
     ok: true,
     event: {
@@ -384,27 +433,27 @@ export function resolveBattle(state, event) {
     if (attacker.getAtk() > target.getAtk()) {
       state[opponent].lp -= attacker.getAtk() - target.getAtk();
       sendMonsterToGraveyard(state, opponent, targetIndex);
-      return { ok: true, message: `${target.getName()} was destroyed and sent to the graveyard.` };
+      return completeBattle(state, `${target.getName()} was destroyed and sent to the graveyard.`);
     }
     if (attacker.getAtk() === target.getAtk()) {
       sendMonsterToGraveyard(state, opponent, targetIndex);
       sendMonsterToGraveyard(state, player, attackerIndex);
-      return { ok: true, message: "Both monsters were destroyed and sent to the graveyard." };
+      return completeBattle(state, "Both monsters were destroyed and sent to the graveyard.");
     }
     state[player].lp -= target.getAtk() - attacker.getAtk();
     sendMonsterToGraveyard(state, player, attackerIndex);
-    return { ok: true, message: `${attacker.getName()} was destroyed and sent to the graveyard.` };
+    return completeBattle(state, `${attacker.getName()} was destroyed and sent to the graveyard.`);
   }
 
   if (attacker.getAtk() > target.getDef()) {
     sendMonsterToGraveyard(state, opponent, targetIndex);
-    return { ok: true, message: `${target.getName()} was destroyed and sent to the graveyard.` };
+    return completeBattle(state, `${target.getName()} was destroyed and sent to the graveyard.`);
   }
   if (attacker.getAtk() < target.getDef()) {
     state[player].lp -= target.getDef() - attacker.getAtk();
-    return { ok: true, message: `${attacker.getName()} have less atk points than ${target.getName()} defense points and the difference between then will be substract to your life points.` };
+    return completeBattle(state, `${attacker.getName()} have less atk points than ${target.getName()} defense points and the difference between then will be substract to your life points.`);
   }
-  return { ok: true, message: "The attack and defense values are equal; nothing happens." };
+  return completeBattle(state, "The attack and defense values are equal; nothing happens.");
 }
 
 export function battle(state, player, attackerIndex, targetIndex) {

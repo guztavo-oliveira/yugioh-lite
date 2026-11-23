@@ -6,6 +6,7 @@ export class MonsterCard extends Card {
     #level
     #position
     #alreadyAttacked = false
+    #setTurn = null
 
     constructor({name, atk, def, level, type}, position, visibility, player, zone){
         super(name, type, visibility, player, zone)
@@ -37,6 +38,14 @@ export class MonsterCard extends Card {
 
     getAlreadyAttacked(){
         return this.#alreadyAttacked
+    }
+
+    markSet(turn){
+        this.#setTurn = turn
+    }
+
+    getSetTurn(){
+        return this.#setTurn
     }
 
     toString(){

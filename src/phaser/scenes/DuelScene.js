@@ -4,8 +4,10 @@ import {
   activateSpell,
   activateSetSpell,
   activateTrap,
+  addGameLog,
   createGameState,
   declareAttack,
+  flipSummon,
   getEligibleTraps,
   getOpponent,
   handlePhase,
@@ -22,7 +24,7 @@ const SCREEN_WIDTH = 1920;
 const SCREEN_HEIGHT = 1080;
 const CARD_WIDTH = 100;
 const CARD_HEIGHT = 140;
-const CARD_GAP = 28;
+const CARD_GAP = 45;
 const CARD_TEXTURES = {
   "Blue-Eyes White Dragon": "blue-eyes",
   "La Jinn the Mystical Genie of the Lamp": "la-jinn",
@@ -114,6 +116,7 @@ export class DuelScene extends Phaser.Scene {
       if (traps.length > 0) {
         this.showTrapResponseModal(player, traps, () => {
           pendingResponse.responderIndex = responderIndex + 1;
+          addGameLog(this.state, `${player === "p1" ? "Player 1" : "Player 2"} passed their trap response.`);
           this.registry.set("pendingTrapResponse", pendingResponse);
           this.scene.restart();
         }, (supportIndex) => {
@@ -144,6 +147,7 @@ export class DuelScene extends Phaser.Scene {
     this.renderPlaymat();
     this.renderPlayerPanel(opponent, currentTurnPlayer, turn, phase);
     this.renderPiles(opponent, currentTurnPlayer);
+    this.renderDuelLog();
     this.renderOpponentHand(opponent);
 
     this.renderPhaseControls();
@@ -219,6 +223,18 @@ export class DuelScene extends Phaser.Scene {
     this.renderPile("OPPONENT GRAVE", 1445, 445, this.state[opponent].graveyard.length);
     this.renderPile("YOUR GRAVE", 1445, 650, this.state[player].graveyard.length);
     this.renderPile("YOUR DECK", 1445, 845, this.state[player].deck.length);
+  }
+
+  renderDuelLog() {
+    const entries = this.state.log.slice(-15);
+    this.add.rectangle(1710, 755, 360, 430, 0x102637).setStrokeStyle(3, 0x8aa5b5);
+    this.add.text(1710, 565, "DUEL LOG", this.labelStyle(20)).setOrigin(0.5);
+    this.add.text(1545, 610, entries.map((entry) => `• ${entry}`).join("\n") || "No actions yet.", {
+      color: "#f8fafc",
+      fontSize: "14px",
+      wordWrap: { width: 330 },
+      lineSpacing: 2,
+    });
   }
 
   renderPile(label, x, y, count) {
@@ -304,6 +320,10 @@ export class DuelScene extends Phaser.Scene {
         this.addSetSpellActivation(card, cardX, y, index, owner);
       }
 
+      if (card && card.getType() === CARD_TYPES.MONSTER) {
+        this.addFlipSummonAction(card, cardX, y, index, owner);
+      }
+
       if (card && card.getType() === CARD_TYPES.MONSTER && this.state.phase === DUEL_PHASES.BATTLE) {
         this.addBattleTarget(card, cardX, y, index, owner);
       }
@@ -332,6 +352,32 @@ export class DuelScene extends Phaser.Scene {
       }
       this.addActionButton("Activate", x + CARD_WIDTH / 2, y - 25, () => {
         this.activateSetSpell(owner, supportIndex);
+      });
+    });
+  }
+
+  addFlipSummonAction(card, x, y, monsterIndex, owner) {
+    const isMainPhase = this.state.phase === DUEL_PHASES.MAIN_1
+      || this.state.phase === DUEL_PHASES.MAIN_2;
+    const canFlipSummon = owner === this.state.currentTurnPlayer
+      && isMainPhase
+      && card.getVisibility() === VISIBILITY.FACE_DOWN
+      && card.getPosition() === POSITIONS.DEFENSE
+      && card.getSetTurn() < this.state.turn;
+    if (!canFlipSummon) return;
+
+    const actionArea = this.add.zone(
+      x + CARD_WIDTH / 2,
+      y + CARD_HEIGHT / 2,
+      CARD_WIDTH,
+      CARD_HEIGHT,
+    ).setInteractive({ useHandCursor: true }).setDepth(5);
+
+    actionArea.on("pointerdown", () => {
+      this.clearActionMenu();
+      this.addActionButton("Flip Summon", x + CARD_WIDTH / 2, y - 25, () => {
+        const result = flipSummon(this.state, owner, monsterIndex);
+        if (result.ok) this.scene.restart();
       });
     });
   }
@@ -459,6 +505,10 @@ export class DuelScene extends Phaser.Scene {
       cardObjects.push(selectionBorder);
       this.addHandHoverArea(x, y, card, cardObjects, selectionBorder, handIndex);
     }
+
+    if (!isSelectable && card.getType() === CARD_TYPES.MONSTER && card.getPosition() === POSITIONS.DEFENSE) {
+      cardObjects.forEach((cardObject) => cardObject.setAngle(-90));
+    }
   }
 
   addHandHoverArea(x, y, card, cardObjects, selectionBorder, handIndex) {
@@ -536,7 +586,11 @@ export class DuelScene extends Phaser.Scene {
       });
     }
 
-    this.addActionButton("Set", x + CARD_WIDTH, y - 46, () => {
+    const setLabel = card.getType() === CARD_TYPES.TRAP
+      ? x + CARD_WIDTH / 2
+      : x + CARD_WIDTH;
+
+    this.addActionButton("Set", setLabel, y - 46, () => {
       setCard(this.state, player, handIndex);
       this.scene.restart();
     });
