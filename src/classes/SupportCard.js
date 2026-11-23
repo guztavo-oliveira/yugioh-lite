@@ -5,8 +5,8 @@ export class SupportCard extends Card {
     #effect
     #setTurn = null
 
-    constructor({name, type, subtype, effect}, visibility, player, zone){
-        super(name, type, visibility, player, zone)
+    constructor({name, type, subtype, effect, description}, visibility, player, zone){
+        super(name, type, visibility, player, zone, description)
         this.#subtype = subtype
         this.#effect  = effect
     }

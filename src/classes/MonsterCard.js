@@ -8,8 +8,8 @@ export class MonsterCard extends Card {
     #alreadyAttacked = false
     #setTurn = null
 
-    constructor({name, atk, def, level, type}, position, visibility, player, zone){
-        super(name, type, visibility, player, zone)
+    constructor({name, atk, def, level, type, description}, position, visibility, player, zone){
+        super(name, type, visibility, player, zone, description)
         this.#atk      = atk
         this.#def      = def
         this.#level    = level

@@ -55,6 +55,7 @@ export class DuelScene extends Phaser.Scene {
     this.actionMenu = [];
     this.targetModal = [];
     this.responseModal = [];
+    this.selectedCardPreview = null;
     this.selectedAttackerIndex = this.registry.get("selectedAttackerIndex") ?? null;
     this.attackArrow = null;
     this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x07141d);
@@ -147,6 +148,7 @@ export class DuelScene extends Phaser.Scene {
     this.renderPlaymat();
     this.renderPlayerPanel(opponent, currentTurnPlayer, turn, phase);
     this.renderPiles(opponent, currentTurnPlayer);
+    this.renderCardPreview();
     this.renderDuelLog();
     this.renderOpponentHand(opponent);
 
@@ -227,14 +229,63 @@ export class DuelScene extends Phaser.Scene {
 
   renderDuelLog() {
     const entries = this.state.log.slice(-15);
-    this.add.rectangle(1710, 755, 360, 430, 0x102637).setStrokeStyle(3, 0x8aa5b5);
+    this.add.rectangle(1710, 755, 360, 422, 0x102637).setStrokeStyle(3, 0x8aa5b5);
     this.add.text(1710, 565, "DUEL LOG", this.labelStyle(20)).setOrigin(0.5);
-    this.add.text(1545, 610, entries.map((entry) => `• ${entry}`).join("\n") || "No actions yet.", {
+    this.add.text(1545, 590, entries.map((entry) => `• ${entry}`).join("\n") || "No actions yet.", {
       color: "#f8fafc",
       fontSize: "14px",
       wordWrap: { width: 330 },
       lineSpacing: 2,
     });
+  }
+
+  renderCardPreview() {
+    const selection = this.selectedCardPreview;
+    const panelObjects = this.cardPreviewObjects ?? [];
+    panelObjects.forEach((object) => object.destroy());
+    this.cardPreviewObjects = [];
+    const addPreviewObject = (object) => {
+      this.cardPreviewObjects.push(object);
+      return object;
+    };
+    addPreviewObject(this.add.rectangle(1710, 259, 360, 390, 0x102637).setStrokeStyle(3, 0x8aa5b5));
+    addPreviewObject(this.add.text(1710, 90, "CARD DETAILS", this.labelStyle(20)).setOrigin(0.5));
+    if (!selection) {
+      addPreviewObject(this.add.text(1710, 250, "Mouse hover one of your cards to view its details.", {
+        color: "#cbd5e1",
+        fontSize: "15px",
+        align: "center",
+        wordWrap: { width: 300 },
+      }).setOrigin(0.5));
+      return;
+    }
+
+    const { card, owner } = selection;
+    const isHiddenFromViewer = card.getVisibility() === VISIBILITY.FACE_DOWN
+      && owner !== this.state.currentTurnPlayer;
+    if (isHiddenFromViewer) {
+      addPreviewObject(this.add.image(1585, 275, "card-back").setDisplaySize(90, 126));
+      addPreviewObject(this.add.text(1650, 225, "Face-down card", {
+        color: "#f8fafc",
+        fontSize: "16px",
+        wordWrap: { width: 220 },
+      }));
+      return;
+    }
+
+    const texture = CARD_TEXTURES[card.getName()];
+    if (texture) {
+      addPreviewObject(this.add.image(1585, 285, texture).setDisplaySize(100, 140));
+    }
+    const description = [card.getName(), card.getDescription()];
+    if (card.getType() === CARD_TYPES.MONSTER) {
+      description.push(`ATK ${card.getAtk()} / DEF ${card.getDef()}`);
+    }
+    addPreviewObject(this.add.text(texture ? 1650 : 1555, 220, description.join("\n\n"), {
+      color: "#f8fafc",
+      fontSize: "15px",
+      wordWrap: { width: texture ? 220 : 310 },
+    }));
   }
 
   renderPile(label, x, y, count) {
@@ -324,6 +375,20 @@ export class DuelScene extends Phaser.Scene {
         this.addFlipSummonAction(card, cardX, y, index, owner);
       }
 
+      if (card && card.getType() !== CARD_TYPES.MONSTER && card.getType() !== CARD_TYPES.SPELL) {
+        this.addSupportPreviewArea(card, cardX, y, owner);
+      }
+
+      if (card && card.getType() === CARD_TYPES.MONSTER
+        && !(owner === this.state.currentTurnPlayer
+          && (this.state.phase === DUEL_PHASES.MAIN_1 || this.state.phase === DUEL_PHASES.MAIN_2)
+          && card.getVisibility() === VISIBILITY.FACE_DOWN
+          && card.getPosition() === POSITIONS.DEFENSE
+          && card.getSetTurn() < this.state.turn)
+        && !(this.state.phase === DUEL_PHASES.BATTLE && this.state.turn !== 1)) {
+        this.addSupportPreviewArea(card, cardX, y, owner);
+      }
+
       if (card && card.getType() === CARD_TYPES.MONSTER && this.state.phase === DUEL_PHASES.BATTLE) {
         this.addBattleTarget(card, cardX, y, index, owner);
       }
@@ -344,16 +409,30 @@ export class DuelScene extends Phaser.Scene {
       CARD_HEIGHT,
     ).setInteractive({ useHandCursor: true }).setDepth(5);
 
+    activationArea.on("pointerover", () => this.setCardPreview(card, owner));
+    activationArea.on("pointerout", () => this.clearCardPreview());
+
     activationArea.on("pointerdown", () => {
       this.clearActionMenu();
-      if (card.getEffect() === "SPECIAL_SUMMON_FROM_GRAVEYARD") {
-        this.showSetMonsterRebornTargets(owner, supportIndex);
-        return;
-      }
       this.addActionButton("Activate", x + CARD_WIDTH / 2, y - 25, () => {
+        if (card.getEffect() === "SPECIAL_SUMMON_FROM_GRAVEYARD") {
+          this.showSetMonsterRebornTargets(owner, supportIndex);
+          return;
+        }
         this.activateSetSpell(owner, supportIndex);
       });
     });
+  }
+
+  addSupportPreviewArea(card, x, y, owner) {
+    const previewArea = this.add.zone(
+      x + CARD_WIDTH / 2,
+      y + CARD_HEIGHT / 2,
+      CARD_WIDTH,
+      CARD_HEIGHT,
+    ).setInteractive({ useHandCursor: true }).setDepth(5);
+    previewArea.on("pointerover", () => this.setCardPreview(card, owner));
+    previewArea.on("pointerout", () => this.clearCardPreview());
   }
 
   addFlipSummonAction(card, x, y, monsterIndex, owner) {
@@ -373,6 +452,9 @@ export class DuelScene extends Phaser.Scene {
       CARD_HEIGHT,
     ).setInteractive({ useHandCursor: true }).setDepth(5);
 
+    actionArea.on("pointerover", () => this.setCardPreview(card, owner));
+    actionArea.on("pointerout", () => this.clearCardPreview());
+
     actionArea.on("pointerdown", () => {
       this.clearActionMenu();
       this.addActionButton("Flip Summon", x + CARD_WIDTH / 2, y - 25, () => {
@@ -380,6 +462,18 @@ export class DuelScene extends Phaser.Scene {
         if (result.ok) this.scene.restart();
       });
     });
+  }
+
+  setCardPreview(card, owner) {
+    if (this.selectedCardPreview?.card === card) return;
+    this.selectedCardPreview = { card, owner };
+    this.renderCardPreview();
+  }
+
+  clearCardPreview() {
+    if (!this.selectedCardPreview) return;
+    this.selectedCardPreview = null;
+    this.renderCardPreview();
   }
 
   addBattleTarget(card, x, y, index, owner) {
@@ -397,6 +491,9 @@ export class DuelScene extends Phaser.Scene {
       CARD_WIDTH,
       CARD_HEIGHT,
     ).setInteractive({ useHandCursor: true }).setDepth(5);
+
+    targetArea.on("pointerover", () => this.setCardPreview(card, owner));
+    targetArea.on("pointerout", () => this.clearCardPreview());
 
     if (ownerIsCurrentPlayer) {
       targetArea.on("pointerdown", () => {
@@ -519,14 +616,17 @@ export class DuelScene extends Phaser.Scene {
       CARD_WIDTH,
       CARD_HEIGHT,
     ).setInteractive({ useHandCursor: true });
+    hoverArea.setDepth(6);
 
     hoverArea.on("pointerover", () => {
       this.moveHandCard(cardObjects, restingPositions, -18, "Sine.Out");
       if (this.selectedHandIndex !== handIndex) this.clearActionMenu();
+      this.setCardPreview(card, this.state.currentTurnPlayer);
     });
 
     hoverArea.on("pointerout", () => {
       this.moveHandCard(cardObjects, restingPositions, 0, "Sine.In");
+      this.clearCardPreview();
     });
 
     hoverArea.on("pointerdown", () => {

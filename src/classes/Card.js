@@ -4,13 +4,15 @@ export class Card {
     #player
     #visibility
     #zone
+    #description
 
-    constructor(name, type, visibility, player, zone){
+    constructor(name, type, visibility, player, zone, description){
         this.name        = name
         this.#type       = type
         this.#player     = player
         this.#visibility = visibility
         this.#zone       = zone
+        this.#description = description
     }
 
     getName(){
@@ -19,6 +21,10 @@ export class Card {
 
     getType(){
         return this.#type
+    }
+
+    getDescription(){
+        return this.#description ?? "No description available."
     }
 
     setVisibility(visibility){
