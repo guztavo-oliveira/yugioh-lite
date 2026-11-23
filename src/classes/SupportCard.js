@@ -9,4 +9,12 @@ export class SupportCard extends Card {
         this.#subtype = subtype
         this.#effect  = effect
     }
+
+    getEffect(){
+        return this.#effect
+    }
+
+    getSubtype(){
+        return this.#subtype
+    }
 }

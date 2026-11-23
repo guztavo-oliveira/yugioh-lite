@@ -1,6 +1,17 @@
 import Phaser from "phaser";
-import { advancePhase, handlePhase, normalSummon, setCard } from "../../engine.js";
-import { CARD_TYPES, DUEL_PHASES, DUEL_PHASES_FLOW, VISIBILITY } from "../../utils/constants.js";
+import {
+  advancePhase,
+  activateSpell,
+  activateSetSpell,
+  battle,
+  createGameState,
+  handlePhase,
+  normalSummon,
+  resolveSpell,
+  setCard,
+  startDuel,
+} from "../../engine.js";
+import { CARD_TYPES, DUEL_PHASES, DUEL_PHASES_FLOW, POSITIONS, VISIBILITY } from "../../utils/constants.js";
 
 const SCREEN_WIDTH = 1920;
 const SCREEN_HEIGHT = 1080;
@@ -22,8 +33,28 @@ export class DuelScene extends Phaser.Scene {
     this.selectedHandCard = null;
     this.selectedHandIndex = null;
     this.actionMenu = [];
+    this.targetModal = [];
+    this.selectedAttackerIndex = this.registry.get("selectedAttackerIndex") ?? null;
+    this.attackArrow = null;
     this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x07141d);
     this.renderBoard();
+    this.resolvePendingSpell();
+  }
+
+  resolvePendingSpell() {
+    const pendingSpell = this.registry.get("pendingSpellResolution");
+    if (!pendingSpell) return;
+
+    this.time.delayedCall(650, () => {
+      resolveSpell(
+        this.state,
+        pendingSpell.player,
+        pendingSpell.supportIndex,
+        pendingSpell.target,
+      );
+      this.registry.set("pendingSpellResolution", null);
+      this.scene.restart();
+    });
   }
 
   renderBoard() {
@@ -73,6 +104,32 @@ export class DuelScene extends Phaser.Scene {
     this.add.line(45, 735, 25, 0, 305, 0, 0x8aa5b5, 0.8);
     this.add.text(65, 775, `TURN ${turn}`, this.labelStyle(22));
     this.add.text(65, 815, `PHASE: ${phase.replace("_", " ")}`, this.labelStyle(18));
+    this.addRestartDuelButton();
+  }
+
+  addRestartDuelButton() {
+    const x = 200;
+    const y = 870;
+    const button = this.add.rectangle(x, y, 235, 48, 0x991b1b)
+      .setStrokeStyle(3, 0xfef3c7)
+      .setInteractive({ useHandCursor: true });
+    const text = this.add.text(x, y, "RESTART DUEL", {
+      color: "#fef3c7",
+      fontSize: "18px",
+      fontStyle: "bold",
+    }).setOrigin(0.5);
+
+    button.on("pointerdown", () => this.restartDuel());
+    text.setInteractive({ useHandCursor: true }).on("pointerdown", () => this.restartDuel());
+  }
+
+  restartDuel() {
+    const state = createGameState();
+    startDuel(state);
+    handlePhase(state);
+    this.registry.set("gameState", state);
+    this.registry.set("selectedAttackerIndex", null);
+    this.scene.restart();
   }
 
   renderPiles(opponent, player) {
@@ -135,6 +192,7 @@ export class DuelScene extends Phaser.Scene {
   }
 
   advanceToPhase(targetPhase) {
+    this.registry.set("selectedAttackerIndex", null);
     if (targetPhase === DUEL_PHASES.END) {
       while (this.state.phase !== DUEL_PHASES.MAIN_2) advancePhase(this.state);
       advancePhase(this.state);
@@ -154,9 +212,122 @@ export class DuelScene extends Phaser.Scene {
       const cardX = x + index * (CARD_WIDTH + CARD_GAP);
       this.add.rectangle(cardX + CARD_WIDTH / 2, y + CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT, 0x0c202c, 0.85)
         .setStrokeStyle(3, 0x8aa5b5, 0.8);
-      console.log(card)
-      if (card) this.renderCard(card, cardX, y, owner !== this.state.currentTurnPlayer);
+      if (card && [CARD_TYPES.SPELL, CARD_TYPES.TRAP].includes(card.getType())) {
+        this.renderCard(card, cardX, y, owner !== this.state.currentTurnPlayer);
+      } else if (card) {
+        this.renderCard(card, cardX, y, false)
+      };
+
+      if (card && card.getType() === CARD_TYPES.SPELL) {
+        this.addSetSpellActivation(card, cardX, y, index, owner);
+      }
+
+      if (card && card.getType() === CARD_TYPES.MONSTER && this.state.phase === DUEL_PHASES.BATTLE) {
+        this.addBattleTarget(card, cardX, y, index, owner);
+      }
     }
+  }
+
+  addSetSpellActivation(card, x, y, supportIndex, owner) {
+    const isMainPhase = this.state.phase === DUEL_PHASES.MAIN_1
+      || this.state.phase === DUEL_PHASES.MAIN_2;
+    if (owner !== this.state.currentTurnPlayer || !isMainPhase || this.registry.get("pendingSpellResolution")) {
+      return;
+    }
+
+    const activationArea = this.add.zone(
+      x + CARD_WIDTH / 2,
+      y + CARD_HEIGHT / 2,
+      CARD_WIDTH,
+      CARD_HEIGHT,
+    ).setInteractive({ useHandCursor: true }).setDepth(5);
+
+    activationArea.on("pointerdown", () => {
+      this.clearActionMenu();
+      if (card.getEffect() === "SPECIAL_SUMMON_FROM_GRAVEYARD") {
+        this.showSetMonsterRebornTargets(owner, supportIndex);
+        return;
+      }
+      this.addActionButton("Activate", x + CARD_WIDTH / 2, y - 25, () => {
+        this.activateSetSpell(owner, supportIndex);
+      });
+    });
+  }
+
+  addBattleTarget(card, x, y, index, owner) {
+    if (this.state.turn === 1) return;
+
+    const ownerIsCurrentPlayer = owner === this.state.currentTurnPlayer;
+    if (ownerIsCurrentPlayer && this.selectedAttackerIndex === index) {
+      this.add.rectangle(x + CARD_WIDTH / 2, y + CARD_HEIGHT / 2, CARD_WIDTH + 10, CARD_HEIGHT + 10, 0, 0)
+        .setStrokeStyle(5, 0xfbbf24)
+        .setDepth(4);
+    }
+    const targetArea = this.add.zone(
+      x + CARD_WIDTH / 2,
+      y + CARD_HEIGHT / 2,
+      CARD_WIDTH,
+      CARD_HEIGHT,
+    ).setInteractive({ useHandCursor: true }).setDepth(5);
+
+    if (ownerIsCurrentPlayer) {
+      targetArea.on("pointerdown", () => {
+        const canAttack = card.getVisibility() === VISIBILITY.FACE_UP
+          && card.getPosition() === POSITIONS.ATTACK
+          && !card.getAlreadyAttacked();
+        if (!canAttack) return;
+
+        this.selectedAttackerIndex = this.selectedAttackerIndex === index ? null : index;
+        this.registry.set("selectedAttackerIndex", this.selectedAttackerIndex);
+        this.scene.restart();
+      });
+      return;
+    }
+
+    targetArea.on("pointerover", () => {
+      if (this.selectedAttackerIndex !== null) this.drawAttackArrow(index);
+    });
+    targetArea.on("pointerout", () => {
+      if (this.attackArrow) {
+        this.attackArrow.clear();
+        this.attackArrow = null;
+      }
+    });
+    targetArea.on("pointerdown", () => {
+      if (this.selectedAttackerIndex === null) return;
+
+      const attackerIndex = this.selectedAttackerIndex;
+      this.drawAttackArrow(index);
+      const result = battle(this.state, this.state.currentTurnPlayer, attackerIndex, index);
+      this.selectedAttackerIndex = null;
+      this.registry.set("selectedAttackerIndex", null);
+      if (!result.ok) {
+        this.time.delayedCall(650, () => this.scene.restart());
+        return;
+      }
+      this.time.delayedCall(650, () => this.scene.restart());
+    });
+  }
+
+  drawAttackArrow(targetIndex) {
+    if (this.attackArrow) this.attackArrow.destroy();
+
+    const attackerX = 665 + this.selectedAttackerIndex * (CARD_WIDTH + CARD_GAP) + CARD_WIDTH / 2;
+    const attackerY = 570 + CARD_HEIGHT / 2;
+    const targetX = 665 + targetIndex * (CARD_WIDTH + CARD_GAP) + CARD_WIDTH / 2;
+    const targetY = 340 + CARD_HEIGHT / 2;
+    const angle = Phaser.Math.Angle.Between(attackerX, attackerY, targetX, targetY);
+    const arrowLength = 24;
+    const leftX = targetX - arrowLength * Math.cos(angle - Math.PI / 6);
+    const leftY = targetY - arrowLength * Math.sin(angle - Math.PI / 6);
+    const rightX = targetX - arrowLength * Math.cos(angle + Math.PI / 6);
+    const rightY = targetY - arrowLength * Math.sin(angle + Math.PI / 6);
+
+    this.attackArrow = this.add.graphics().setDepth(15);
+    this.attackArrow.lineStyle(8, 0xff3b30, 0.95);
+    this.attackArrow.lineBetween(attackerX, attackerY - 70, targetX, targetY + 70);
+    this.attackArrow.fillStyle(0xff3b30, 1);
+    this.attackArrow.fillTriangle(targetX, targetY + 70, leftX, leftY + 70, rightX, rightY + 70);
   }
 
   renderHand(player) {
@@ -273,13 +444,129 @@ export class DuelScene extends Phaser.Scene {
     }
 
     if (card.getType() === CARD_TYPES.SPELL) {
-      this.addActionButton("Activate (soon)", x - 7, y - 46, null, true);
+      this.addActionButton("Activate", x - 7, y - 46, () => {
+        if (card.getEffect() === "SPECIAL_SUMMON_FROM_GRAVEYARD") {
+          this.showMonsterRebornTargets(handIndex);
+          return;
+        }
+        this.activateSpellFromHand(player, handIndex);
+      });
     }
 
     this.addActionButton("Set", x + CARD_WIDTH, y - 46, () => {
       setCard(this.state, player, handIndex);
       this.scene.restart();
     });
+  }
+
+  showMonsterRebornTargets(handIndex) {
+    this.showMonsterRebornTargetModal((target) => {
+      this.activateSpellFromHand(this.state.currentTurnPlayer, handIndex, target);
+    });
+  }
+
+  showSetMonsterRebornTargets(player, supportIndex) {
+    this.showMonsterRebornTargetModal((target) => {
+      this.activateSetSpell(player, supportIndex, target);
+    });
+  }
+
+  showMonsterRebornTargetModal(onSelect) {
+    this.clearActionMenu();
+    this.clearTargetModal();
+    const targets = ["p1", "p2"].flatMap((owner) => (
+      this.state[owner].graveyard.map((card, graveyardIndex) => ({ card, owner, graveyardIndex }))
+    )).filter(({ card }) => card.getType() === CARD_TYPES.MONSTER);
+
+    const overlay = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x000000, 0.68)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(30);
+    this.targetModal.push(overlay);
+    overlay.on("pointerdown", () => this.clearTargetModal());
+
+    if (targets.length === 0) {
+      const message = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, "No monster cards are available to revive.", {
+        color: "#f8fafc",
+        fontSize: "24px",
+        fontStyle: "bold",
+      }).setOrigin(0.5).setDepth(32);
+      this.targetModal.push(message);
+      return;
+    }
+
+    const columns = Math.min(targets.length, 5);
+    const rows = Math.ceil(targets.length / columns);
+    const modalHeight = 110 + rows * 220;
+    const panel = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 1540, modalHeight, 0x102637)
+      .setStrokeStyle(4, 0xfbbf24)
+      .setDepth(31);
+    const title = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - modalHeight / 2 + 42, "MONSTER REBORN — CHOOSE A MONSTER", {
+      color: "#fef3c7",
+      fontSize: "24px",
+      fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(32);
+    this.targetModal.push(panel, title);
+
+    targets.forEach(({ card, owner, graveyardIndex }, index) => {
+      const row = Math.floor(index / columns);
+      const column = index % columns;
+      const cardX = SCREEN_WIDTH / 2 - ((columns - 1) * 165) / 2 + column * 165;
+      const cardY = SCREEN_HEIGHT / 2 - modalHeight / 2 + 165 + row * 220;
+      this.renderMonsterRebornTarget(card, cardX, cardY, () => {
+        onSelect({ player: owner, graveyardIndex });
+      });
+    });
+  }
+
+  renderMonsterRebornTarget(card, x, y, onSelect) {
+    const texture = CARD_TEXTURES[card.getName()];
+    const cardObjects = [];
+
+    if (texture) {
+      cardObjects.push(this.add.image(x, y, texture).setDisplaySize(130, 182));
+    } else {
+      cardObjects.push(this.add.rectangle(x, y, 130, 182, 0xf1e0a7).setStrokeStyle(3, 0x362b1d));
+      cardObjects.push(this.add.text(x - 54, y - 68, `${card.getName()}\n\nATK ${card.getAtk()} / DEF ${card.getDef()}`, {
+        color: "#1f2937",
+        fontSize: "14px",
+        wordWrap: { width: 108 },
+      }));
+    }
+
+    cardObjects.forEach((cardObject) => cardObject.setDepth(32));
+    const hoverBorder = this.add.rectangle(x, y, 138, 190, 0x000000, 0)
+      .setStrokeStyle(4, 0xfbbf24)
+      .setVisible(false)
+      .setDepth(32);
+    const targetArea = this.add.zone(x, y, 130, 182).setInteractive({ useHandCursor: true }).setDepth(33);
+    targetArea.on("pointerdown", onSelect);
+    targetArea.on("pointerover", () => hoverBorder.setVisible(true));
+    targetArea.on("pointerout", () => hoverBorder.setVisible(false));
+    this.targetModal.push(...cardObjects, hoverBorder, targetArea);
+  }
+
+  activateSpellFromHand(player, handIndex, target = null) {
+    const result = activateSpell(this.state, player, handIndex);
+    if (!result.ok) return;
+
+    this.registry.set("pendingSpellResolution", {
+      player,
+      supportIndex: result.supportIndex,
+      target,
+    });
+    this.scene.restart();
+  }
+
+  activateSetSpell(player, supportIndex, target = null) {
+    const result = activateSetSpell(this.state, player, supportIndex);
+    if (!result.ok) return;
+
+    this.registry.set("pendingSpellResolution", {
+      player,
+      supportIndex: result.supportIndex,
+      target,
+    });
+    this.scene.restart();
   }
 
   addActionButton(label, x, y, onClick, disabled = false) {
@@ -299,6 +586,11 @@ export class DuelScene extends Phaser.Scene {
   clearActionMenu() {
     this.actionMenu.forEach((item) => item.destroy());
     this.actionMenu = [];
+  }
+
+  clearTargetModal() {
+    this.targetModal.forEach((item) => item.destroy());
+    this.targetModal = [];
   }
 
   moveHandCard(cardObjects, restingPositions, offset, ease) {

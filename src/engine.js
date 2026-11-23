@@ -2,6 +2,7 @@ import {
   CARD_TYPES,
   DUEL_PHASES,
   DUEL_PHASES_FLOW,
+  GAME_CONFIGS,
   POSITIONS,
   VISIBILITY,
   ZONES,
@@ -10,21 +11,25 @@ import { MonsterCard } from "./classes/MonsterCard.js";
 import { SupportCard } from "./classes/SupportCard.js";
 import { CARD_DATABASE } from "./cardsDatabase.js";
 
-export const gameState = {
-  currentTurnPlayer: "p1",
-  phase: DUEL_PHASES.DRAW,
-  turn: 1,
-  p1: {
-    lp: 8000,
-    deck: ["c001", "c002", "c003", "c006", "c007", "c008", "c009", "c010", "c011", "c012", "c013"],
-    hand: [], monsters: [], supports: [], graveyard: [], normalSummoned: false,
-  },
-  p2: {
-    lp: 8000,
-    deck: ["c005", "c004", "c003", "c006", "c007", "c008", "c009", "c010", "c011", "c012", "c013"],
-    hand: [], monsters: [], supports: [], graveyard: [], normalSummoned: false,
-  },
-};
+export function createGameState() {
+  return {
+    currentTurnPlayer: "p1",
+    phase: DUEL_PHASES.DRAW,
+    turn: 1,
+    p1: {
+      lp: 8000,
+      deck: ["c001", "c002", "c003", "c006", "c007", "c008", "c009", "c010", "c011", "c012", "c013"],
+      hand: [], monsters: [], supports: [], graveyard: [], normalSummoned: false,
+    },
+    p2: {
+      lp: 8000,
+      deck: ["c005", "c004", "c003", "c006", "c007", "c008", "c009", "c010", "c011", "c012", "c013"],
+      hand: [], monsters: [], supports: [], graveyard: [], normalSummoned: false,
+    },
+  };
+}
+
+export const gameState = createGameState();
 
 export function getOpponent(player) {
   return player === "p1" ? "p2" : "p1";
@@ -47,7 +52,24 @@ function moveCardFromHand(state, player, handIndex) {
 
 function sendMonsterToGraveyard(state, player, monsterIndex) {
   const [monster] = state[player].monsters.splice(monsterIndex, 1);
+  monster.setZone(ZONES.GRAVEYARD);
   state[player].graveyard.push(monster);
+}
+
+function sendAllMonstersToGraveyard(state, player) {
+  while (state[player].monsters.length > 0) {
+    sendMonsterToGraveyard(state, player, 0);
+  }
+}
+
+function sendSupportToGraveyard(state, player, supportIndex) {
+  const [card] = state[player].supports.splice(supportIndex, 1);
+  card.setZone(ZONES.GRAVEYARD);
+  state[player].graveyard.push(card);
+}
+
+function isMainPhase(phase) {
+  return phase === DUEL_PHASES.MAIN_1 || phase === DUEL_PHASES.MAIN_2;
 }
 
 export function drawCard(state, player) {
@@ -130,6 +152,94 @@ export function setCard(state, player, handIndex) {
   state[player].supports.push(card);
   moveCardFromHand(state, player, handIndex);
   return { ok: true, message: `Setting ${card.getName()} face down.` };
+}
+
+export function activateSpell(state, player, handIndex) {
+  const card = state[player]?.hand[handIndex];
+  if (!isMainPhase(state.phase)) {
+    return { ok: false, message: "Spells can only be activated during a Main Phase." };
+  }
+  if (!card || card.getType() !== CARD_TYPES.SPELL) {
+    return { ok: false, message: "Choose a spell card from your hand." };
+  }
+
+  if (card.getEffect() === "DRAW_2_CARDS" && state[player].deck.length < 2) {
+    return { ok: false, message: "There are not enough cards left in your deck." };
+  }
+
+  card.setVisibility(VISIBILITY.FACE_UP);
+  card.setZone(ZONES.SUPPORT_ZONE);
+  state[player].supports.push(card);
+  moveCardFromHand(state, player, handIndex);
+  return {
+    ok: true,
+    message: `${card.getName()} was activated.`,
+    supportIndex: state[player].supports.length - 1,
+  };
+}
+
+export function activateSetSpell(state, player, supportIndex) {
+  const card = state[player]?.supports[supportIndex];
+  if (!isMainPhase(state.phase)) {
+    return { ok: false, message: "Spells can only be activated during a Main Phase." };
+  }
+  if (!card || card.getType() !== CARD_TYPES.SPELL) {
+    return { ok: false, message: "Choose a spell card from your Spell/Trap Zone." };
+  }
+  if (card.getEffect() === "DRAW_2_CARDS" && state[player].deck.length < 2) {
+    return { ok: false, message: "There are not enough cards left in your deck." };
+  }
+
+  card.setVisibility(VISIBILITY.FACE_UP);
+  return { ok: true, message: `${card.getName()} was activated.`, supportIndex };
+}
+
+export function resolveSpell(state, player, supportIndex, target = null) {
+  const card = state[player]?.supports[supportIndex];
+  if (!card || card.getType() !== CARD_TYPES.SPELL) {
+    return { ok: false, message: "Choose an activated spell card." };
+  }
+
+  switch (card.getEffect()) {
+    case "DESTROY_ALL_MONSTERS":
+      sendAllMonstersToGraveyard(state, "p1");
+      sendAllMonstersToGraveyard(state, "p2");
+      break;
+
+    case "DESTROY_ALL_OPPONENT_MONSTERS":
+      sendAllMonstersToGraveyard(state, getOpponent(player));
+      break;
+
+    case "DRAW_2_CARDS":
+      drawCard(state, player);
+      drawCard(state, player);
+      break;
+
+    case "SPECIAL_SUMMON_FROM_GRAVEYARD": {
+      const targetPlayer = target?.player;
+      const targetIndex = target?.graveyardIndex;
+      const monster = state[targetPlayer]?.graveyard[targetIndex];
+      if (!monster || monster.getType() !== CARD_TYPES.MONSTER) {
+        return { ok: false, message: "Choose a monster from a graveyard." };
+      }
+      if (state[player].monsters.length >= GAME_CONFIGS.MAX_MOSTER_ZONES) {
+        return { ok: false, message: "Your Monster Zone is full." };
+      }
+
+      state[targetPlayer].graveyard.splice(targetIndex, 1);
+      monster.setVisibility(VISIBILITY.FACE_UP);
+      monster.setPosition(POSITIONS.ATTACK);
+      monster.setZone(ZONES.MONSTER_ZONE);
+      state[player].monsters.push(monster);
+      break;
+    }
+
+    default:
+      return { ok: false, message: "This spell does not have an implemented effect." };
+  }
+
+  sendSupportToGraveyard(state, player, supportIndex);
+  return { ok: true, message: `${card.getName()} resolved.` };
 }
 
 export function battle(state, player, attackerIndex, targetIndex) {
