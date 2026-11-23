@@ -69,4 +69,9 @@ export const DUEL_ACTIVITIES = {
     NEXT_PHASE:    {type: "NEXT_PHASE", text: "Advance to next phase"}
 }
 
+export const TRAP_TRIGGER_EVENTS = {
+    MONSTER_SUMMONED: "MONSTER_SUMMONED",
+    ATTACK_DECLARED: "ATTACK_DECLARED"
+}
+
 export const DUEL_PHASES_FLOW = ["DRAW", "MAIN_1", "BATTLE", "MAIN_2", "END"]

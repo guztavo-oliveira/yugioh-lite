@@ -3,6 +3,7 @@ import {Card} from "./Card.js"
 export class SupportCard extends Card {
     #subtype
     #effect
+    #setTurn = null
 
     constructor({name, type, subtype, effect}, visibility, player, zone){
         super(name, type, visibility, player, zone)
@@ -16,5 +17,13 @@ export class SupportCard extends Card {
 
     getSubtype(){
         return this.#subtype
+    }
+
+    markSet(turn){
+        this.#setTurn = turn
+    }
+
+    getSetTurn(){
+        return this.#setTurn
     }
 }

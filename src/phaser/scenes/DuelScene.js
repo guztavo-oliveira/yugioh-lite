@@ -3,11 +3,16 @@ import {
   advancePhase,
   activateSpell,
   activateSetSpell,
-  battle,
+  activateTrap,
   createGameState,
+  declareAttack,
+  getEligibleTraps,
+  getOpponent,
   handlePhase,
   normalSummon,
+  resolveBattle,
   resolveSpell,
+  resolveTrap,
   setCard,
   startDuel,
 } from "../../engine.js";
@@ -47,11 +52,14 @@ export class DuelScene extends Phaser.Scene {
     this.selectedHandIndex = null;
     this.actionMenu = [];
     this.targetModal = [];
+    this.responseModal = [];
     this.selectedAttackerIndex = this.registry.get("selectedAttackerIndex") ?? null;
     this.attackArrow = null;
     this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x07141d);
     this.renderBoard();
     this.resolvePendingSpell();
+    this.resolvePendingTrap();
+    this.showPendingTrapResponse();
   }
 
   resolvePendingSpell() {
@@ -68,6 +76,65 @@ export class DuelScene extends Phaser.Scene {
       this.registry.set("pendingSpellResolution", null);
       this.scene.restart();
     });
+  }
+
+  resolvePendingTrap() {
+    const pendingTrap = this.registry.get("pendingTrapResolution");
+    if (!pendingTrap) return;
+
+    this.time.delayedCall(650, () => {
+      resolveTrap(
+        this.state,
+        pendingTrap.player,
+        pendingTrap.supportIndex,
+        pendingTrap.event,
+      );
+      this.registry.set("pendingTrapResolution", null);
+      this.scene.restart();
+    });
+  }
+
+  beginTrapResponse(event) {
+    const responders = event.type === "MONSTER_SUMMONED"
+      ? [event.player, getOpponent(event.player)]
+      : [event.opponent];
+    this.registry.set("pendingTrapResponse", { event, responders, responderIndex: 0 });
+    this.scene.restart();
+  }
+
+  showPendingTrapResponse() {
+    const pendingResponse = this.registry.get("pendingTrapResponse");
+    if (!pendingResponse || this.registry.get("pendingTrapResolution")) return;
+
+    const { event, responders } = pendingResponse;
+    let responderIndex = pendingResponse.responderIndex;
+    while (responderIndex < responders.length) {
+      const player = responders[responderIndex];
+      const traps = getEligibleTraps(this.state, player, event);
+      if (traps.length > 0) {
+        this.showTrapResponseModal(player, traps, () => {
+          pendingResponse.responderIndex = responderIndex + 1;
+          this.registry.set("pendingTrapResponse", pendingResponse);
+          this.scene.restart();
+        }, (supportIndex) => {
+          const result = activateTrap(this.state, player, supportIndex, event);
+          if (!result.ok) return;
+          this.registry.set("pendingTrapResponse", null);
+          this.registry.set("pendingTrapResolution", {
+            event,
+            player,
+            supportIndex: result.supportIndex,
+          });
+          this.scene.restart();
+        });
+        return;
+      }
+      responderIndex++;
+    }
+
+    this.registry.set("pendingTrapResponse", null);
+    if (event.type === "ATTACK_DECLARED") resolveBattle(this.state, event);
+    this.scene.restart();
   }
 
   renderBoard() {
@@ -142,6 +209,8 @@ export class DuelScene extends Phaser.Scene {
     handlePhase(state);
     this.registry.set("gameState", state);
     this.registry.set("selectedAttackerIndex", null);
+    this.registry.set("pendingTrapResponse", null);
+    this.registry.set("pendingTrapResolution", null);
     this.scene.restart();
   }
 
@@ -311,14 +380,14 @@ export class DuelScene extends Phaser.Scene {
 
       const attackerIndex = this.selectedAttackerIndex;
       this.drawAttackArrow(index);
-      const result = battle(this.state, this.state.currentTurnPlayer, attackerIndex, index);
+      const result = declareAttack(this.state, this.state.currentTurnPlayer, attackerIndex, index);
       this.selectedAttackerIndex = null;
       this.registry.set("selectedAttackerIndex", null);
       if (!result.ok) {
         this.time.delayedCall(650, () => this.scene.restart());
         return;
       }
-      this.time.delayedCall(650, () => this.scene.restart());
+      this.beginTrapResponse(result.event);
     });
   }
 
@@ -436,8 +505,9 @@ export class DuelScene extends Phaser.Scene {
     if (card.getType() !== CARD_TYPES.MONSTER || !canNormalSummon) return;
 
     this.addActionButton("Normal Summon", x - 7, y - 46, () => {
-      normalSummon(this.state, player, handIndex);
-      this.scene.restart();
+      const result = normalSummon(this.state, player, handIndex);
+      if (!result.ok) return;
+      this.beginTrapResponse(result.event);
     });
     this.addActionButton("Set", x + CARD_WIDTH, y - 46, () => {
       setCard(this.state, player, handIndex);
@@ -558,6 +628,69 @@ export class DuelScene extends Phaser.Scene {
     this.targetModal.push(...cardObjects, hoverBorder, targetArea);
   }
 
+  showTrapResponseModal(player, traps, onPass, onSelect) {
+    this.clearResponseModal();
+    const overlay = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x000000, 0.72)
+      .setInteractive()
+      .setDepth(30);
+    const panel = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 980, 440, 0x102637)
+      .setStrokeStyle(4, 0xfbbf24)
+      .setDepth(31);
+    const title = this.add.text(SCREEN_WIDTH / 2, 400, "TRAP RESPONSE", {
+      color: "#fef3c7",
+      fontSize: "26px",
+      fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(32);
+    const prompt = this.add.text(SCREEN_WIDTH / 2, 435, `${player === "p1" ? "PLAYER 1" : "PLAYER 2"}: choose a set trap or pass.`, {
+      color: "#f8fafc",
+      fontSize: "18px",
+    }).setOrigin(0.5).setDepth(32);
+    this.responseModal.push(overlay, panel, title, prompt);
+
+    const startX = SCREEN_WIDTH / 2 - ((traps.length - 1) * 150) / 2;
+    traps.forEach(({ card, supportIndex }, index) => {
+      this.renderTrapResponseCard(card, startX + index * 150, 560, () => onSelect(supportIndex));
+    });
+
+    const passButton = this.add.rectangle(SCREEN_WIDTH / 2, 710, 150, 38, 0x475569)
+      .setStrokeStyle(2, 0xfef3c7)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(33);
+    const passText = this.add.text(SCREEN_WIDTH / 2, 710, "PASS", {
+      color: "#f8fafc",
+      fontSize: "16px",
+      fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(34);
+    passButton.on("pointerdown", onPass);
+    passText.setInteractive({ useHandCursor: true }).on("pointerdown", onPass);
+    this.responseModal.push(passButton, passText);
+  }
+
+  renderTrapResponseCard(card, x, y, onSelect) {
+    const texture = CARD_TEXTURES[card.getName()];
+    const cardObjects = [];
+    if (texture) {
+      cardObjects.push(this.add.image(x, y, texture).setDisplaySize(120, 168));
+    } else {
+      cardObjects.push(this.add.rectangle(x, y, 120, 168, 0xd8b4fe).setStrokeStyle(3, 0x581c87));
+      cardObjects.push(this.add.text(x - 48, y - 45, card.getName(), {
+        color: "#1f2937",
+        fontSize: "14px",
+        wordWrap: { width: 96 },
+      }));
+    }
+    cardObjects.forEach((cardObject) => cardObject.setDepth(32));
+    const hoverBorder = this.add.rectangle(x, y, 128, 176, 0x000000, 0)
+      .setStrokeStyle(4, 0xfbbf24)
+      .setVisible(false)
+      .setDepth(32);
+    const targetArea = this.add.zone(x, y, 120, 168).setInteractive({ useHandCursor: true }).setDepth(33);
+    targetArea.on("pointerdown", onSelect);
+    targetArea.on("pointerover", () => hoverBorder.setVisible(true));
+    targetArea.on("pointerout", () => hoverBorder.setVisible(false));
+    this.responseModal.push(...cardObjects, hoverBorder, targetArea);
+  }
+
   activateSpellFromHand(player, handIndex, target = null) {
     const result = activateSpell(this.state, player, handIndex);
     if (!result.ok) return;
@@ -604,6 +737,11 @@ export class DuelScene extends Phaser.Scene {
   clearTargetModal() {
     this.targetModal.forEach((item) => item.destroy());
     this.targetModal = [];
+  }
+
+  clearResponseModal() {
+    this.responseModal.forEach((item) => item.destroy());
+    this.responseModal = [];
   }
 
   moveHandCard(cardObjects, restingPositions, offset, ease) {
