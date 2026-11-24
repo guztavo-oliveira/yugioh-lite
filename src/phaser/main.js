@@ -11,7 +11,7 @@ const game = new Phaser.Game({
   parent: "game",
   width: 1920,
   height: 1080,
-  backgroundColor: "#173c3c",
+  backgroundColor: "#0c0a08",
   scene: [BootScene, DuelScene],
   scale: {
     mode: Phaser.Scale.FIT,

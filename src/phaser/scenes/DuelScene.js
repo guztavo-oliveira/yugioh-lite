@@ -26,6 +26,33 @@ const SCREEN_HEIGHT = 1080;
 const CARD_WIDTH = 100;
 const CARD_HEIGHT = 140;
 const CARD_GAP = 45;
+
+const RETRO_THEME = {
+  SCREEN_BG: 0x0c0a08,
+  PANEL_BG: 0x181512,
+  PANEL_BORDER: 0x8c703d,
+  PANEL_INNER_BORDER: 0x473822,
+  PLAYMAT_BG: 0x0f281e,
+  PLAYMAT_BORDER: 0x6e5730,
+  DIVIDER_LINE: 0x594628,
+  ZONE_BG: 0x0d1913,
+  ZONE_BORDER: 0x4a3c26,
+  DESC_BOX_BG: 0x120f0c,
+  DESC_BOX_BORDER: 0x735930,
+  TEXT_GOLD: "#f3c343",
+  TEXT_LIGHT_GOLD: "#fae5a7",
+  TEXT_PARCHMENT: "#f0e6cf",
+  TEXT_MUTED: "#a89b88",
+  MODAL_BG: 0x17130f,
+  BUTTON_RED: 0x7f1d1d,
+  BUTTON_RED_HOVER: 0x991b1b,
+  BUTTON_GREEN: 0x1e6634,
+  BUTTON_GREEN_HOVER: 0x278343,
+  PHASE_CURRENT: 0xd99b26,
+  PHASE_FORWARD: 0x6e1b1b,
+  PHASE_INACTIVE: 0x211d18,
+};
+
 const CARD_TEXTURES = {
   "Blue-Eyes White Dragon": "blue-eyes",
   "La Jinn the Mystical Genie of the Lamp": "la-jinn",
@@ -59,7 +86,7 @@ export class DuelScene extends Phaser.Scene {
     this.selectedCardPreview = this.registry.get("selectedCardPreview") ?? null;
     this.selectedAttackerIndex = this.registry.get("selectedAttackerIndex") ?? null;
     this.attackArrow = null;
-    this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x07141d);
+    this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, RETRO_THEME.SCREEN_BG);
     this.renderBoard();
 
     const winner = checkWinCondition(this.state);
@@ -74,39 +101,39 @@ export class DuelScene extends Phaser.Scene {
   }
 
   showGameOverModal(winner) {
-    const overlay = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x000000, 0.82)
+    this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x000000, 0.85)
       .setInteractive()
       .setDepth(50);
 
-    const panel = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 700, 380, 0x102637)
-      .setStrokeStyle(5, 0xfbbf24)
+    this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 700, 380, RETRO_THEME.MODAL_BG)
+      .setStrokeStyle(5, RETRO_THEME.PANEL_BORDER)
       .setDepth(51);
 
     const isDraw = winner === "DRAW";
     const headerText = isDraw ? "DUEL DRAW!" : (winner === "p1" ? "PLAYER 1 WON!" : "PLAYER 2 WON!");
-    const headerColor = isDraw ? "#94a3b8" : "#fbbf24";
+    const headerColor = isDraw ? RETRO_THEME.TEXT_MUTED : RETRO_THEME.TEXT_GOLD;
 
-    const title = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 100, headerText, {
+    this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 100, headerText, {
       color: headerColor,
       fontSize: "44px",
       fontStyle: "bold",
     }).setOrigin(0.5).setDepth(52);
 
     const reason = this.state.winReason || (isDraw ? "Both players reached 0 LP." : `${winner === "p1" ? "Player 1" : "Player 2"} wins the duel!`);
-    const subtitle = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 25, reason, {
-      color: "#f8fafc",
+    this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 25, reason, {
+      color: RETRO_THEME.TEXT_PARCHMENT,
       fontSize: "20px",
       align: "center",
       wordWrap: { width: 600 },
     }).setOrigin(0.5).setDepth(52);
 
-    const playAgainBtn = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 80, 240, 52, 0x15803d)
-      .setStrokeStyle(3, 0xfef3c7)
+    const playAgainBtn = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 80, 240, 52, RETRO_THEME.BUTTON_GREEN)
+      .setStrokeStyle(3, 0xd4af37)
       .setInteractive({ useHandCursor: true })
       .setDepth(52);
 
     const playAgainText = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 80, "PLAY AGAIN", {
-      color: "#fef3c7",
+      color: RETRO_THEME.TEXT_LIGHT_GOLD,
       fontSize: "22px",
       fontStyle: "bold",
     }).setOrigin(0.5).setDepth(53);
@@ -114,8 +141,8 @@ export class DuelScene extends Phaser.Scene {
     playAgainBtn.on("pointerdown", () => this.restartDuel());
     playAgainText.setInteractive({ useHandCursor: true }).on("pointerdown", () => this.restartDuel());
 
-    playAgainBtn.on("pointerover", () => playAgainBtn.setFillStyle(0x16a34a));
-    playAgainBtn.on("pointerout", () => playAgainBtn.setFillStyle(0x15803d));
+    playAgainBtn.on("pointerover", () => playAgainBtn.setFillStyle(RETRO_THEME.BUTTON_GREEN_HOVER));
+    playAgainBtn.on("pointerout", () => playAgainBtn.setFillStyle(RETRO_THEME.BUTTON_GREEN));
   }
 
   resolvePendingSpell() {
@@ -214,34 +241,30 @@ export class DuelScene extends Phaser.Scene {
   }
 
   renderPlaymat() {
-    this.add.rectangle(1050, 515, 1000, 900, 0x153447).setStrokeStyle(5, 0x8aa5b5);
-    this.add.image(1050, 515, "playmat")
-      .setDisplaySize(990, 890)
-      .setTint(0x4d6f82)
-      .setAlpha(0.18);
-    this.add.rectangle(1050, 525, 960, 8, 0xd5b362, 0.7);
-    this.add.text(975, 94, "OPPONENT FIELD", this.labelStyle(18)).setOrigin(0.5);
-    this.add.text(975, 920, "YOUR FIELD", this.labelStyle(18)).setOrigin(0.5);
+    this.add.rectangle(1050, 515, 1000, 900, RETRO_THEME.PLAYMAT_BG).setStrokeStyle(5, RETRO_THEME.PLAYMAT_BORDER);
+    this.add.rectangle(1050, 525, 960, 6, 0x997a3d, 0.75);
+    this.add.text(1440, 94, "OPPONENT FIELD", { color: RETRO_THEME.TEXT_LIGHT_GOLD, fontSize: "16px", fontStyle: "bold" }).setOrigin(0.5);
+    this.add.text(975, 910, "YOUR FIELD", { color: RETRO_THEME.TEXT_LIGHT_GOLD, fontSize: "16px", fontStyle: "bold" }).setOrigin(0.5);
   }
 
   renderPlayerPanel(opponent, player, turn, phase) {
-    this.add.rectangle(1710, 259, 360, 390, 0x102637).setStrokeStyle(3, 0x8aa5b5);
+    this.add.rectangle(1710, 259, 360, 390, RETRO_THEME.PANEL_BG).setStrokeStyle(3, RETRO_THEME.PANEL_BORDER);
 
     // Opponent status
-    this.add.text(1545, 82, "OPPONENT", this.labelStyle(16));
-    this.add.text(1545, 108, `LP  ${this.state[opponent].lp}`, this.labelStyle(24));
+    this.add.text(1545, 82, "OPPONENT", { color: RETRO_THEME.TEXT_LIGHT_GOLD, fontSize: "16px", fontStyle: "bold" });
+    this.add.text(1545, 108, `LP  ${this.state[opponent].lp}`, { color: RETRO_THEME.TEXT_GOLD, fontSize: "26px", fontStyle: "bold" });
 
-    this.add.line(1545, 150, 0, 0, 330, 0, 0x8aa5b5, 0.6).setOrigin(0, 0);
+    this.add.line(1545, 150, 0, 0, 330, 0, RETRO_THEME.DIVIDER_LINE, 0.8).setOrigin(0, 0);
 
     // Player status
-    this.add.text(1545, 168, "YOUR TURN", this.labelStyle(16));
-    this.add.text(1545, 194, `LP  ${this.state[player].lp}`, this.labelStyle(24));
+    this.add.text(1545, 168, "YOUR TURN", { color: RETRO_THEME.TEXT_LIGHT_GOLD, fontSize: "16px", fontStyle: "bold" });
+    this.add.text(1545, 194, `LP  ${this.state[player].lp}`, { color: RETRO_THEME.TEXT_GOLD, fontSize: "26px", fontStyle: "bold" });
 
-    this.add.line(1545, 236, 0, 0, 330, 0, 0x8aa5b5, 0.6).setOrigin(0, 0);
+    this.add.line(1545, 236, 0, 0, 330, 0, RETRO_THEME.DIVIDER_LINE, 0.8).setOrigin(0, 0);
 
     // Turn & Phase
-    this.add.text(1545, 254, `TURN ${turn}`, this.labelStyle(18));
-    this.add.text(1545, 282, `PHASE: ${phase.replace("_", " ")}`, this.labelStyle(15));
+    this.add.text(1545, 254, `TURN ${turn}`, { color: RETRO_THEME.TEXT_LIGHT_GOLD, fontSize: "18px", fontStyle: "bold" });
+    this.add.text(1545, 282, `PHASE: ${phase.replace("_", " ")}`, { color: RETRO_THEME.TEXT_GOLD, fontSize: "15px", fontStyle: "bold" });
 
     this.addRestartDuelButton();
   }
@@ -249,11 +272,11 @@ export class DuelScene extends Phaser.Scene {
   addRestartDuelButton() {
     const x = 1710;
     const y = 390;
-    const button = this.add.rectangle(x, y, 260, 42, 0x991b1b)
-      .setStrokeStyle(2, 0xfef3c7)
+    const button = this.add.rectangle(x, y, 260, 42, RETRO_THEME.BUTTON_RED)
+      .setStrokeStyle(2, 0xd4af37)
       .setInteractive({ useHandCursor: true });
     const text = this.add.text(x, y, "RESTART DUEL", {
-      color: "#fef3c7",
+      color: RETRO_THEME.TEXT_LIGHT_GOLD,
       fontSize: "16px",
       fontStyle: "bold",
     }).setOrigin(0.5);
@@ -261,8 +284,8 @@ export class DuelScene extends Phaser.Scene {
     button.on("pointerdown", () => this.restartDuel());
     text.setInteractive({ useHandCursor: true }).on("pointerdown", () => this.restartDuel());
 
-    button.on("pointerover", () => button.setFillStyle(0xb91c1c));
-    button.on("pointerout", () => button.setFillStyle(0x991b1b));
+    button.on("pointerover", () => button.setFillStyle(RETRO_THEME.BUTTON_RED_HOVER));
+    button.on("pointerout", () => button.setFillStyle(RETRO_THEME.BUTTON_RED));
   }
 
   restartDuel() {
@@ -300,10 +323,10 @@ export class DuelScene extends Phaser.Scene {
 
   renderDuelLog() {
     const entries = this.state.log.slice(-14);
-    this.add.rectangle(1710, 755, 360, 422, 0x102637).setStrokeStyle(3, 0x8aa5b5);
-    this.add.text(1710, 565, "DUEL LOG", this.labelStyle(20)).setOrigin(0.5);
+    this.add.rectangle(1710, 755, 360, 422, RETRO_THEME.PANEL_BG).setStrokeStyle(3, RETRO_THEME.PANEL_BORDER);
+    this.add.text(1710, 565, "DUEL LOG", { color: RETRO_THEME.TEXT_GOLD, fontSize: "20px", fontStyle: "bold" }).setOrigin(0.5);
     this.add.text(1545, 590, entries.map((entry) => `• ${entry}`).join("\n") || "No actions yet.", {
-      color: "#f8fafc",
+      color: RETRO_THEME.TEXT_PARCHMENT,
       fontSize: "14px",
       wordWrap: { width: 330 },
       lineSpacing: 2,
@@ -324,11 +347,11 @@ export class DuelScene extends Phaser.Scene {
     const panelCenterX = 285;
     const panelWidth = 480;
     const panelHeight = 900;
-    addPreviewObject(this.add.rectangle(panelCenterX, 515, panelWidth, panelHeight, 0x102637).setStrokeStyle(4, 0x8aa5b5));
+    addPreviewObject(this.add.rectangle(panelCenterX, 515, panelWidth, panelHeight, RETRO_THEME.PANEL_BG).setStrokeStyle(4, RETRO_THEME.PANEL_BORDER));
 
     if (!selection) {
       addPreviewObject(this.add.text(panelCenterX, 515, "Hover over a card to view its details.", {
-        color: "#cbd5e1",
+        color: RETRO_THEME.TEXT_MUTED,
         fontSize: "20px",
         align: "center",
         wordWrap: { width: 380 },
@@ -340,29 +363,25 @@ export class DuelScene extends Phaser.Scene {
     const isHiddenFromViewer = card.getVisibility() === VISIBILITY.FACE_DOWN
       && owner !== this.state.currentTurnPlayer;
 
-    // Panel is at y = 515, height = 900 (spans y = 65 to y = 965).
-    // Card with size 380x532: top edge at y = 84, bottom edge at y = 616 (well within y = 65).
     const cardWidth = 380;
     const cardHeight = 532;
     const cardCenterX = panelCenterX;
     const cardCenterY = 350;
 
-    // Description box below card: spans y = 635 to y = 955 (height: 320, center: 795).
     const descBoxY = 795;
     const descBoxHeight = 320;
     const descBoxWidth = 450;
 
     if (isHiddenFromViewer) {
       addPreviewObject(this.add.image(cardCenterX, cardCenterY, "card-back").setDisplaySize(cardWidth, cardHeight));
-      // Description box below card
-      addPreviewObject(this.add.rectangle(panelCenterX, descBoxY, descBoxWidth, descBoxHeight, 0x0a1924).setStrokeStyle(2, 0x8aa5b5));
+      addPreviewObject(this.add.rectangle(panelCenterX, descBoxY, descBoxWidth, descBoxHeight, RETRO_THEME.DESC_BOX_BG).setStrokeStyle(2, RETRO_THEME.DESC_BOX_BORDER));
       addPreviewObject(this.add.text(panelCenterX, descBoxY - 80, "Face-Down Card", {
-        color: "#fbbf24",
+        color: RETRO_THEME.TEXT_GOLD,
         fontSize: "22px",
         fontStyle: "bold",
       }).setOrigin(0.5));
       addPreviewObject(this.add.text(panelCenterX - descBoxWidth / 2 + 25, descBoxY - 20, "This card is face-down on the opponent's field.", {
-        color: "#f8fafc",
+        color: RETRO_THEME.TEXT_PARCHMENT,
         fontSize: "17px",
         wordWrap: { width: descBoxWidth - 50 },
       }));
@@ -383,36 +402,31 @@ export class DuelScene extends Phaser.Scene {
       }).setOrigin(0.5));
     }
 
-    // Description box below the card
-    addPreviewObject(this.add.rectangle(panelCenterX, descBoxY, descBoxWidth, descBoxHeight, 0x0a1924).setStrokeStyle(2, 0x8aa5b5));
+    addPreviewObject(this.add.rectangle(panelCenterX, descBoxY, descBoxWidth, descBoxHeight, RETRO_THEME.DESC_BOX_BG).setStrokeStyle(2, RETRO_THEME.DESC_BOX_BORDER));
 
     const contentLeft = panelCenterX - descBoxWidth / 2 + 20;
 
-    // Card Name
     addPreviewObject(this.add.text(contentLeft, descBoxY - descBoxHeight / 2 + 16, card.getName(), {
-      color: "#fef3c7",
+      color: RETRO_THEME.TEXT_GOLD,
       fontSize: "21px",
       fontStyle: "bold",
       wordWrap: { width: descBoxWidth - 40 },
     }));
 
-    // Card Subtitle (Type & ATK/DEF)
     let statsText = `[${card.getType()}]`;
     if (card.getType() === CARD_TYPES.MONSTER) {
       statsText += `   ATK ${card.getAtk()} / DEF ${card.getDef()}`;
     }
     addPreviewObject(this.add.text(contentLeft, descBoxY - descBoxHeight / 2 + 50, statsText, {
-      color: "#fbbf24",
+      color: RETRO_THEME.TEXT_LIGHT_GOLD,
       fontSize: "16px",
       fontStyle: "bold",
     }));
 
-    // Divider line
-    addPreviewObject(this.add.line(contentLeft - 5, descBoxY - descBoxHeight / 2 + 76, 0, 0, descBoxWidth - 30, 0, 0x8aa5b5, 0.5).setOrigin(0, 0));
+    addPreviewObject(this.add.line(contentLeft - 5, descBoxY - descBoxHeight / 2 + 76, 0, 0, descBoxWidth - 30, 0, RETRO_THEME.DIVIDER_LINE, 0.8).setOrigin(0, 0));
 
-    // Description / Effect text
     addPreviewObject(this.add.text(contentLeft, descBoxY - descBoxHeight / 2 + 88, card.getDescription() || "No effect text.", {
-      color: "#f8fafc",
+      color: RETRO_THEME.TEXT_PARCHMENT,
       fontSize: "15px",
       lineSpacing: 4,
       wordWrap: { width: descBoxWidth - 40 },
@@ -421,17 +435,19 @@ export class DuelScene extends Phaser.Scene {
 
   renderPile(label, x, y, count, onClick = null, topCard = null) {
     const pile = this.add.container(x, y);
-    pile.add(this.add.rectangle(0, 0, 126, 166, 0x0b1f2c).setStrokeStyle(3, 0x8aa5b5));
+    pile.add(this.add.rectangle(0, 0, 126, 166, RETRO_THEME.ZONE_BG).setStrokeStyle(3, RETRO_THEME.PLAYMAT_BORDER));
 
     const topCardTexture = topCard ? CARD_TEXTURES[topCard.getName()] : null;
     if (topCardTexture) {
       pile.add(this.add.image(0, -9, topCardTexture).setDisplaySize(78, 108));
+    } else if (label.includes("GRAVE")) {
+      pile.add(this.add.rectangle(0, 0, 126, 166, RETRO_THEME.ZONE_BG).setStrokeStyle(3, RETRO_THEME.ZONE_BORDER));      
     } else {
       pile.add(this.add.image(0, -9, "card-back").setDisplaySize(78, 108));
     }
 
     pile.add(this.add.text(0, 65, `${label}\n${count}`, {
-      color: "#f8fafc",
+      color: RETRO_THEME.TEXT_LIGHT_GOLD,
       fontSize: "12px",
       fontStyle: "bold",
       align: "center",
@@ -446,25 +462,25 @@ export class DuelScene extends Phaser.Scene {
   showGraveyardModal(owner) {
     this.clearTargetModal();
     const cards = this.state[owner].graveyard;
-    const overlay = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x000000, 0.72)
+    const overlay = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x000000, 0.75)
       .setInteractive({ useHandCursor: true }).setDepth(30);
     this.targetModal.push(overlay);
     overlay.on("pointerdown", () => this.clearTargetModal());
 
     if (cards.length === 0) {
       const title = this.add.text(SCREEN_WIDTH / 2, 480, `${owner === "p1" ? "PLAYER 1" : "PLAYER 2"} GRAVEYARD\n\nThe Graveyard is empty.`, {
-        color: "#fef3c7", fontSize: "24px", fontStyle: "bold", align: "center",
+        color: RETRO_THEME.TEXT_LIGHT_GOLD, fontSize: "24px", fontStyle: "bold", align: "center",
       }).setOrigin(0.5).setDepth(32);
       this.targetModal.push(title);
       return;
     }
 
     const modalHeight = 330;
-    const panel = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 1540, modalHeight, 0x102637)
-      .setStrokeStyle(4, 0xfbbf24)
+    const panel = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 1540, modalHeight, RETRO_THEME.MODAL_BG)
+      .setStrokeStyle(4, RETRO_THEME.PANEL_BORDER)
       .setDepth(31);
     const title = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - modalHeight / 2 + 42, `${owner === "p1" ? "PLAYER 1" : "PLAYER 2"} GRAVEYARD`, {
-      color: "#fef3c7",
+      color: RETRO_THEME.TEXT_GOLD,
       fontSize: "24px",
       fontStyle: "bold",
     }).setOrigin(0.5).setDepth(32);
@@ -556,16 +572,16 @@ export class DuelScene extends Phaser.Scene {
   }
 
   renderOpponentHand(opponent) {
-    const cards = this.state[opponent].hand.slice(0, 5);
-    const startX = 760;
-    cards.forEach((card, index) => {
-      this.add.image(startX + index * 98, 105, "card-back").setDisplaySize(74, 104);
+    const cards = this.state[opponent].hand;
+    const startX = 840;
+    cards.forEach((_card, index) => {
+      this.add.image(startX + index * 98, 80, "card-back").setDisplaySize(74, 104);
     });
     this.add.text(600, 96, `HAND (${this.state[opponent].hand.length})`, this.labelStyle(14));
   }
 
   renderPhaseControls() {
-    const startX = 758;
+    const startX = 780;
     const y = 525;
     const currentPhaseIndex = DUEL_PHASES_FLOW.indexOf(this.state.phase);
 
@@ -573,16 +589,11 @@ export class DuelScene extends Phaser.Scene {
       const x = startX + index * 86;
       const isCurrentPhase = phase === this.state.phase;
       const isForwardPhase = index > currentPhaseIndex;
-      const phaseButton = this.add.rectangle(
-        x,
-        y,
-        72,
-        32,
-        isCurrentPhase ? 0xfbbf24 : isForwardPhase ? 0x991b1b : 0x172554,
-      )
-        .setStrokeStyle(2, 0xfef3c7);
+      const btnBg = isCurrentPhase ? RETRO_THEME.PHASE_CURRENT : (isForwardPhase ? RETRO_THEME.PHASE_FORWARD : RETRO_THEME.PHASE_INACTIVE);
+      const phaseButton = this.add.rectangle(x, y, 72, 32, btnBg)
+        .setStrokeStyle(2, isCurrentPhase ? 0xffe599 : (isForwardPhase ? 0x991b1b : 0x3d352a));
       const phaseText = this.add.text(x, y, phase.replace("_", " "), {
-        color: isCurrentPhase ? "#1f2937" : "#fef3c7",
+        color: isCurrentPhase ? "#181512" : (isForwardPhase ? RETRO_THEME.TEXT_LIGHT_GOLD : RETRO_THEME.TEXT_MUTED),
         fontSize: "12px",
         fontStyle: "bold",
       }).setOrigin(0.5);
@@ -610,13 +621,13 @@ export class DuelScene extends Phaser.Scene {
   }
 
   renderZone(label, x, y, cards, owner, canDirectAttack = false) {
-    this.add.text(x, y - 26, label, this.labelStyle(15));
+    this.add.text(x, y - 26, label, { color: RETRO_THEME.TEXT_LIGHT_GOLD, fontSize: "14px", fontStyle: "bold" });
 
     for (let index = 0; index < 5; index++) {
       const card = cards[index];
       const cardX = x + index * (CARD_WIDTH + CARD_GAP);
-      this.add.rectangle(cardX + CARD_WIDTH / 2, y + CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT, 0x0c202c, 0.85)
-        .setStrokeStyle(3, 0x8aa5b5, 0.8);
+      this.add.rectangle(cardX + CARD_WIDTH / 2, y + CARD_HEIGHT / 2, CARD_WIDTH, CARD_HEIGHT, RETRO_THEME.ZONE_BG, 0.9)
+        .setStrokeStyle(3, RETRO_THEME.ZONE_BORDER, 0.9);
       if (card && [CARD_TYPES.SPELL, CARD_TYPES.TRAP].includes(card.getType())) {
         this.renderCard(card, cardX, y, owner !== this.state.currentTurnPlayer);
       } else if (card) {
@@ -660,12 +671,7 @@ export class DuelScene extends Phaser.Scene {
       const directAttackArea = this.add.zone(x + 2.5 * (CARD_WIDTH + CARD_GAP), y + CARD_HEIGHT / 2, 5 * (CARD_WIDTH + CARD_GAP), CARD_HEIGHT)
         .setInteractive({ useHandCursor: true }).setDepth(5);
       directAttackArea.on("pointerover", () => this.drawDirectAttackArrow());
-      directAttackArea.on("pointerout", () => {
-        if (this.attackArrow) {
-          this.attackArrow.destroy();
-          this.attackArrow = null;
-        }
-      });
+      directAttackArea.on("pointerout", () => this.clearAttackArrow());
       directAttackArea.on("pointerdown", () => {
         this.drawDirectAttackArrow();
         const result = declareAttack(this.state, this.state.currentTurnPlayer, this.selectedAttackerIndex, null);
@@ -692,7 +698,6 @@ export class DuelScene extends Phaser.Scene {
     ).setInteractive({ useHandCursor: true }).setDepth(5);
 
     activationArea.on("pointerover", () => this.setCardPreview(card, owner));
-    activationArea.on("pointerout", () => this.clearCardPreview());
 
     activationArea.on("pointerdown", () => {
       this.clearActionMenu();
@@ -714,7 +719,6 @@ export class DuelScene extends Phaser.Scene {
       CARD_HEIGHT,
     ).setInteractive({ useHandCursor: true }).setDepth(5);
     previewArea.on("pointerover", () => this.setCardPreview(card, owner));
-    previewArea.on("pointerout", () => this.clearCardPreview());
   }
 
   addFlipSummonAction(card, x, y, monsterIndex, owner) {
@@ -735,7 +739,6 @@ export class DuelScene extends Phaser.Scene {
     ).setInteractive({ useHandCursor: true }).setDepth(5);
 
     actionArea.on("pointerover", () => this.setCardPreview(card, owner));
-    actionArea.on("pointerout", () => this.clearCardPreview());
 
     actionArea.on("pointerdown", () => {
       this.clearActionMenu();
@@ -751,10 +754,6 @@ export class DuelScene extends Phaser.Scene {
     this.selectedCardPreview = { card, owner };
     this.registry.set("selectedCardPreview", this.selectedCardPreview);
     this.renderCardPreview();
-  }
-
-  clearCardPreview() {
-    // Keep the last card previewed until the next card preview
   }
 
   addBattleTarget(card, x, y, index, owner) {
@@ -774,7 +773,6 @@ export class DuelScene extends Phaser.Scene {
     ).setInteractive({ useHandCursor: true }).setDepth(5);
 
     targetArea.on("pointerover", () => this.setCardPreview(card, owner));
-    targetArea.on("pointerout", () => this.clearCardPreview());
 
     if (ownerIsCurrentPlayer) {
       targetArea.on("pointerdown", () => {
@@ -794,10 +792,7 @@ export class DuelScene extends Phaser.Scene {
       if (this.selectedAttackerIndex !== null) this.drawAttackArrow(index);
     });
     targetArea.on("pointerout", () => {
-      if (this.attackArrow) {
-        this.attackArrow.clear();
-        this.attackArrow = null;
-      }
+      this.clearAttackArrow();
     });
     targetArea.on("pointerdown", () => {
       if (this.selectedAttackerIndex === null) return;
@@ -815,56 +810,93 @@ export class DuelScene extends Phaser.Scene {
     });
   }
 
-  drawAttackArrow(targetIndex) {
-    if (this.attackArrow) this.attackArrow.destroy();
+  clearAttackArrow() {
+    if (this.attackArrow) {
+      if (this.attackArrow.tween) this.attackArrow.tween.stop();
+      this.attackArrow.destroy();
+      this.attackArrow = null;
+    }
+  }
 
+  renderArrowVisuals(startX, startY, endX, endY) {
+    this.clearAttackArrow();
+
+    const container = this.add.container(0, 0).setDepth(25);
+    const gfx = this.add.graphics();
+    container.add(gfx);
+
+    const angle = Phaser.Math.Angle.Between(startX, startY, endX, endY);
+    const distance = Phaser.Math.Distance.Between(startX, startY, endX, endY);
+
+    const targetOffset = 45;
+    const startOffset = 45;
+    const actualLength = Math.max(20, distance - startOffset - targetOffset);
+
+    const actualStartX = startX + Math.cos(angle) * startOffset;
+    const actualStartY = startY + Math.sin(angle) * startOffset;
+    const tipX = actualStartX + Math.cos(angle) * actualLength;
+    const tipY = actualStartY + Math.sin(angle) * actualLength;
+
+    const headLength = 26;
+    const headWidth = 14;
+
+    const basePointX = tipX - Math.cos(angle) * headLength;
+    const basePointY = tipY - Math.sin(angle) * headLength;
+
+    const normalAngle = angle + Math.PI / 2;
+    const leftX = basePointX + Math.cos(normalAngle) * headWidth;
+    const leftY = basePointY + Math.sin(normalAngle) * headWidth;
+    const rightX = basePointX - Math.cos(normalAngle) * headWidth;
+    const rightY = basePointY - Math.sin(normalAngle) * headWidth;
+
+    gfx.lineStyle(10, 0xd90429, 0.35);
+    gfx.lineBetween(actualStartX, actualStartY, basePointX, basePointY);
+
+    gfx.lineStyle(5, 0xef233c, 0.95);
+    gfx.lineBetween(actualStartX, actualStartY, basePointX, basePointY);
+
+    gfx.fillStyle(0xd90429, 0.4);
+    gfx.fillTriangle(
+      tipX + Math.cos(angle) * 4, tipY + Math.sin(angle) * 4,
+      leftX + Math.cos(normalAngle) * 3, leftY + Math.sin(normalAngle) * 3,
+      rightX - Math.cos(normalAngle) * 3, rightY - Math.sin(normalAngle) * 3,
+    );
+
+    gfx.fillStyle(0xef233c, 1);
+    gfx.fillTriangle(tipX, tipY, leftX, leftY, rightX, rightY);
+
+    gfx.fillStyle(0xd90429, 0.4);
+    gfx.fillCircle(actualStartX, actualStartY, 8);
+    gfx.fillStyle(0xef233c, 1);
+    gfx.fillCircle(actualStartX, actualStartY, 4);
+
+    this.attackArrow = container;
+  }
+
+  drawAttackArrow(targetIndex) {
     const attackerX = 615 + this.selectedAttackerIndex * (CARD_WIDTH + CARD_GAP) + CARD_WIDTH / 2;
     const attackerY = 570 + CARD_HEIGHT / 2;
     const targetX = 615 + targetIndex * (CARD_WIDTH + CARD_GAP) + CARD_WIDTH / 2;
     const targetY = 340 + CARD_HEIGHT / 2;
-    const angle = Phaser.Math.Angle.Between(attackerX, attackerY, targetX, targetY);
-    const arrowLength = 24;
-    const leftX = targetX - arrowLength * Math.cos(angle - Math.PI / 6);
-    const leftY = targetY - arrowLength * Math.sin(angle - Math.PI / 6);
-    const rightX = targetX - arrowLength * Math.cos(angle + Math.PI / 6);
-    const rightY = targetY - arrowLength * Math.sin(angle + Math.PI / 6);
 
-    this.attackArrow = this.add.graphics().setDepth(15);
-    this.attackArrow.lineStyle(8, 0xff3b30, 0.95);
-    this.attackArrow.lineBetween(attackerX, attackerY - 70, targetX, targetY + 70);
-    this.attackArrow.fillStyle(0xff3b30, 1);
-    this.attackArrow.fillTriangle(targetX, targetY + 70, leftX, leftY + 70, rightX, rightY + 70);
+    this.renderArrowVisuals(attackerX, attackerY, targetX, targetY);
   }
 
   drawDirectAttackArrow() {
     if (this.selectedAttackerIndex === null) return;
-    if (this.attackArrow) this.attackArrow.destroy();
 
     const attackerX = 615 + this.selectedAttackerIndex * (CARD_WIDTH + CARD_GAP) + CARD_WIDTH / 2;
     const attackerY = 570 + CARD_HEIGHT / 2;
-    const targetX = 975;
+    const targetX = 1015;
     const targetY = 340;
-    const angle = Phaser.Math.Angle.Between(attackerX, attackerY - 70, targetX, targetY + 70);
-    const arrowLength = 24;
-    const tipX = targetX;
-    const tipY = targetY + 70;
-    const leftX = tipX - arrowLength * Math.cos(angle - Math.PI / 6);
-    const leftY = tipY - arrowLength * Math.sin(angle - Math.PI / 6);
-    const rightX = tipX - arrowLength * Math.cos(angle + Math.PI / 6);
-    const rightY = tipY - arrowLength * Math.sin(angle + Math.PI / 6);
 
-    this.attackArrow = this.add.graphics().setDepth(15);
-    this.attackArrow.lineStyle(8, 0xff3b30, 0.95);
-    this.attackArrow.lineBetween(attackerX, attackerY - 70, tipX, tipY);
-    this.attackArrow.fillStyle(0xff3b30, 1);
-    this.attackArrow.fillTriangle(tipX, tipY, leftX, leftY, rightX, rightY);
+    this.renderArrowVisuals(attackerX, attackerY, targetX, targetY);
   }
 
   renderHand(player) {
     const cards = player.hand;
     const startX = 615;
     const y = 925;
-    this.add.text(startX, y - 25, "YOUR HAND", this.labelStyle(16));
     cards.forEach((card, index) => {
       this.renderCard(card, startX + index * (CARD_WIDTH + CARD_GAP), y, false, true, index);
     });
@@ -931,7 +963,6 @@ export class DuelScene extends Phaser.Scene {
 
     hoverArea.on("pointerout", () => {
       this.moveHandCard(cardObjects, restingPositions, 0, "Sine.In");
-      this.clearCardPreview();
     });
 
     hoverArea.on("pointerdown", () => {
@@ -1020,7 +1051,7 @@ export class DuelScene extends Phaser.Scene {
       this.state[owner].graveyard.map((card, graveyardIndex) => ({ card, owner, graveyardIndex }))
     )).filter(({ card }) => card.getType() === CARD_TYPES.MONSTER);
 
-    const overlay = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x000000, 0.68)
+    const overlay = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x000000, 0.75)
       .setInteractive({ useHandCursor: true })
       .setDepth(30);
     this.targetModal.push(overlay);
@@ -1028,7 +1059,7 @@ export class DuelScene extends Phaser.Scene {
 
     if (targets.length === 0) {
       const message = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, "No monster cards are available to revive.", {
-        color: "#f8fafc",
+        color: RETRO_THEME.TEXT_LIGHT_GOLD,
         fontSize: "24px",
         fontStyle: "bold",
       }).setOrigin(0.5).setDepth(32);
@@ -1037,11 +1068,11 @@ export class DuelScene extends Phaser.Scene {
     }
 
     const modalHeight = 330;
-    const panel = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 1540, modalHeight, 0x102637)
-      .setStrokeStyle(4, 0xfbbf24)
+    const panel = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 1540, modalHeight, RETRO_THEME.MODAL_BG)
+      .setStrokeStyle(4, RETRO_THEME.PANEL_BORDER)
       .setDepth(31);
     const title = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - modalHeight / 2 + 42, "MONSTER REBORN — CHOOSE A MONSTER", {
-      color: "#fef3c7",
+      color: RETRO_THEME.TEXT_GOLD,
       fontSize: "24px",
       fontStyle: "bold",
     }).setOrigin(0.5).setDepth(32);
@@ -1140,19 +1171,19 @@ export class DuelScene extends Phaser.Scene {
 
   showTrapResponseModal(player, traps, onPass, onSelect) {
     this.clearResponseModal();
-    const overlay = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x000000, 0.72)
+    const overlay = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x000000, 0.75)
       .setInteractive()
       .setDepth(30);
-    const panel = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 980, 440, 0x102637)
-      .setStrokeStyle(4, 0xfbbf24)
+    const panel = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 980, 440, RETRO_THEME.MODAL_BG)
+      .setStrokeStyle(4, RETRO_THEME.PANEL_BORDER)
       .setDepth(31);
     const title = this.add.text(SCREEN_WIDTH / 2, 400, "TRAP RESPONSE", {
-      color: "#fef3c7",
+      color: RETRO_THEME.TEXT_GOLD,
       fontSize: "26px",
       fontStyle: "bold",
     }).setOrigin(0.5).setDepth(32);
     const prompt = this.add.text(SCREEN_WIDTH / 2, 435, `${player === "p1" ? "PLAYER 1" : "PLAYER 2"}: choose a set trap or pass.`, {
-      color: "#f8fafc",
+      color: RETRO_THEME.TEXT_PARCHMENT,
       fontSize: "18px",
     }).setOrigin(0.5).setDepth(32);
     this.responseModal.push(overlay, panel, title, prompt);
@@ -1162,12 +1193,12 @@ export class DuelScene extends Phaser.Scene {
       this.renderTrapResponseCard(card, startX + index * 150, 560, () => onSelect(supportIndex));
     });
 
-    const passButton = this.add.rectangle(SCREEN_WIDTH / 2, 710, 150, 38, 0x475569)
-      .setStrokeStyle(2, 0xfef3c7)
+    const passButton = this.add.rectangle(SCREEN_WIDTH / 2, 710, 150, 38, RETRO_THEME.BUTTON_RED)
+      .setStrokeStyle(2, 0xd4af37)
       .setInteractive({ useHandCursor: true })
       .setDepth(33);
     const passText = this.add.text(SCREEN_WIDTH / 2, 710, "PASS", {
-      color: "#f8fafc",
+      color: RETRO_THEME.TEXT_LIGHT_GOLD,
       fontSize: "16px",
       fontStyle: "bold",
     }).setOrigin(0.5).setDepth(34);
@@ -1226,11 +1257,11 @@ export class DuelScene extends Phaser.Scene {
   }
 
   addActionButton(label, x, y, onClick, disabled = false) {
-    const button = this.add.rectangle(x, y, 100, 30, disabled ? 0x475569 : 0x172554)
-      .setStrokeStyle(2, 0xfbbf24)
+    const button = this.add.rectangle(x, y, 100, 30, disabled ? 0x2d261e : 0x6e1b1b)
+      .setStrokeStyle(2, disabled ? 0x473822 : 0xd4af37)
       .setDepth(20);
     const text = this.add.text(x, y, label, {
-      color: disabled ? "#cbd5e1" : "#fef3c7",
+      color: disabled ? RETRO_THEME.TEXT_MUTED : RETRO_THEME.TEXT_LIGHT_GOLD,
       fontSize: "12px",
       fontStyle: "bold",
     }).setOrigin(0.5).setDepth(21);
@@ -1267,6 +1298,6 @@ export class DuelScene extends Phaser.Scene {
   }
 
   labelStyle(fontSize = 18) {
-    return { color: "#f8fafc", fontSize: `${fontSize}px`, fontStyle: "bold" };
+    return { color: RETRO_THEME.TEXT_LIGHT_GOLD, fontSize: `${fontSize}px`, fontStyle: "bold" };
   }
 }
