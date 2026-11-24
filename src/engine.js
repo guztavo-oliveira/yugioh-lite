@@ -116,8 +116,36 @@ function isEligibleTrap(card, state, player, event) {
 }
 
 export function drawCard(state, player) {
+  if (state[player].deck.length === 0) {
+    state.winner = getOpponent(player);
+    state.winReason = `${getPlayerLabel(player)} ran out of cards to draw.`;
+    addGameLog(state, state.winReason);
+    return false;
+  }
   const cardId = removeCardFromDeck(state, player, 0);
   state[player].hand.push(createCardInstance(cardId, player));
+  return true;
+}
+
+export function checkWinCondition(state) {
+  if (state.winner) return state.winner;
+
+  if (state.p1.lp <= 0 && state.p2.lp <= 0) {
+    state.winner = "DRAW";
+    state.winReason = "Both players' Life Points reached 0 simultaneously.";
+    return "DRAW";
+  }
+  if (state.p1.lp <= 0) {
+    state.winner = "p2";
+    state.winReason = "Player 1's Life Points reached 0.";
+    return "p2";
+  }
+  if (state.p2.lp <= 0) {
+    state.winner = "p1";
+    state.winReason = "Player 2's Life Points reached 0.";
+    return "p1";
+  }
+  return null;
 }
 
 export function drawStartingHand(state, player) {
@@ -153,10 +181,13 @@ export function advancePhase(state) {
 }
 
 export function handlePhase(state) {
+  if (state.winner) return;
   if (state.phase === DUEL_PHASES.DRAW) {
-    drawCard(state, state.currentTurnPlayer);
-    addGameLog(state, `${getPlayerLabel(state.currentTurnPlayer)} drew a card.`);
-    advancePhase(state);
+    const drew = drawCard(state, state.currentTurnPlayer);
+    if (drew) {
+      addGameLog(state, `${getPlayerLabel(state.currentTurnPlayer)} drew a card.`);
+      advancePhase(state);
+    }
   }
 }
 

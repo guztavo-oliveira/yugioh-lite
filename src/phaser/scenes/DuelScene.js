@@ -5,6 +5,7 @@ import {
   activateSetSpell,
   activateTrap,
   addGameLog,
+  checkWinCondition,
   createGameState,
   declareAttack,
   flipSummon,
@@ -60,9 +61,61 @@ export class DuelScene extends Phaser.Scene {
     this.attackArrow = null;
     this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x07141d);
     this.renderBoard();
+
+    const winner = checkWinCondition(this.state);
+    if (winner) {
+      this.showGameOverModal(winner);
+      return;
+    }
+
     this.resolvePendingSpell();
     this.resolvePendingTrap();
     this.showPendingTrapResponse();
+  }
+
+  showGameOverModal(winner) {
+    const overlay = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x000000, 0.82)
+      .setInteractive()
+      .setDepth(50);
+
+    const panel = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 700, 380, 0x102637)
+      .setStrokeStyle(5, 0xfbbf24)
+      .setDepth(51);
+
+    const isDraw = winner === "DRAW";
+    const headerText = isDraw ? "DUEL DRAW!" : (winner === "p1" ? "PLAYER 1 WON!" : "PLAYER 2 WON!");
+    const headerColor = isDraw ? "#94a3b8" : "#fbbf24";
+
+    const title = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 100, headerText, {
+      color: headerColor,
+      fontSize: "44px",
+      fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(52);
+
+    const reason = this.state.winReason || (isDraw ? "Both players reached 0 LP." : `${winner === "p1" ? "Player 1" : "Player 2"} wins the duel!`);
+    const subtitle = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 25, reason, {
+      color: "#f8fafc",
+      fontSize: "20px",
+      align: "center",
+      wordWrap: { width: 600 },
+    }).setOrigin(0.5).setDepth(52);
+
+    const playAgainBtn = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 80, 240, 52, 0x15803d)
+      .setStrokeStyle(3, 0xfef3c7)
+      .setInteractive({ useHandCursor: true })
+      .setDepth(52);
+
+    const playAgainText = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 80, "PLAY AGAIN", {
+      color: "#fef3c7",
+      fontSize: "22px",
+      fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(53);
+
+    playAgainBtn.on("pointerdown", () => this.restartDuel());
+    playAgainText.setInteractive({ useHandCursor: true }).on("pointerdown", () => this.restartDuel());
+
+    playAgainBtn.on("pointerover", () => playAgainBtn.setFillStyle(0x16a34a));
+    playAgainBtn.on("pointerout", () => playAgainBtn.setFillStyle(0x15803d));
   }
 
   resolvePendingSpell() {
