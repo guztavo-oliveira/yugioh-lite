@@ -36,6 +36,10 @@ export class MonsterCard extends Card {
         this.#alreadyAttacked = true
     }
 
+    resetAttack(){
+        this.#alreadyAttacked = false
+    }
+
     getAlreadyAttacked(){
         return this.#alreadyAttacked
     }

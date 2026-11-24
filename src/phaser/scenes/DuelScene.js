@@ -154,7 +154,7 @@ export class DuelScene extends Phaser.Scene {
 
     this.renderPhaseControls();
     this.renderZone("OPPONENT SPELL / TRAP", 615, 160, this.state[opponent].supports, opponent);
-    this.renderZone("OPPONENT MONSTERS", 615, 340, this.state[opponent].monsters, opponent);
+    this.renderZone("OPPONENT MONSTERS", 615, 340, this.state[opponent].monsters, opponent, true);
     this.renderZone("YOUR MONSTERS", 615, 570, this.state[currentTurnPlayer].monsters, currentTurnPlayer);
     this.renderZone("YOUR SPELL / TRAP", 615, 750, this.state[currentTurnPlayer].supports, currentTurnPlayer);
     this.renderHand(this.state[currentTurnPlayer]);
@@ -222,13 +222,17 @@ export class DuelScene extends Phaser.Scene {
 
   renderPiles(opponent, player) {
     this.renderPile("OPPONENT DECK", 1445, 250, this.state[opponent].deck.length);
-    this.renderPile("OPPONENT GRAVE", 1445, 445, this.state[opponent].graveyard.length);
-    this.renderPile("YOUR GRAVE", 1445, 650, this.state[player].graveyard.length);
+    this.renderPile("OPPONENT GRAVE", 1445, 445, this.state[opponent].graveyard.length, () => {
+      this.showGraveyardModal(opponent);
+    });
+    this.renderPile("YOUR GRAVE", 1445, 650, this.state[player].graveyard.length, () => {
+      this.showGraveyardModal(player);
+    });
     this.renderPile("YOUR DECK", 1445, 845, this.state[player].deck.length);
   }
 
   renderDuelLog() {
-    const entries = this.state.log.slice(-15);
+    const entries = this.state.log.slice(-14);
     this.add.rectangle(1710, 755, 360, 422, 0x102637).setStrokeStyle(3, 0x8aa5b5);
     this.add.text(1710, 565, "DUEL LOG", this.labelStyle(20)).setOrigin(0.5);
     this.add.text(1545, 590, entries.map((entry) => `• ${entry}`).join("\n") || "No actions yet.", {
@@ -289,14 +293,131 @@ export class DuelScene extends Phaser.Scene {
   }
 
   renderPile(label, x, y, count) {
-    this.add.rectangle(x, y, 126, 166, 0x0b1f2c).setStrokeStyle(3, 0x8aa5b5);
-    this.add.image(x, y - 9, "card-back").setDisplaySize(78, 108);
-    this.add.text(x, y + 65, `${label}\n${count}`, {
+    const pile = this.add.container(x, y);
+    pile.add(this.add.rectangle(0, 0, 126, 166, 0x0b1f2c).setStrokeStyle(3, 0x8aa5b5));
+    pile.add(this.add.image(0, -9, "card-back").setDisplaySize(78, 108));
+    pile.add(this.add.text(0, 65, `${label}\n${count}`, {
       color: "#f8fafc",
       fontSize: "12px",
       fontStyle: "bold",
       align: "center",
-    }).setOrigin(0.5);
+    }).setOrigin(0.5));
+    if (label.includes("GRAVE")) {
+      pile.setInteractive(new Phaser.Geom.Rectangle(-63, -83, 126, 166), Phaser.Geom.Rectangle.Contains)
+        .on("pointerdown", () => this.showGraveyardModal(label.startsWith("YOUR") ? this.state.currentTurnPlayer : getOpponent(this.state.currentTurnPlayer)));
+    }
+  }
+
+  showGraveyardModal(owner) {
+    this.clearTargetModal();
+    const cards = this.state[owner].graveyard;
+    const overlay = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x000000, 0.72)
+      .setInteractive({ useHandCursor: true }).setDepth(30);
+    this.targetModal.push(overlay);
+    overlay.on("pointerdown", () => this.clearTargetModal());
+
+    if (cards.length === 0) {
+      const title = this.add.text(SCREEN_WIDTH / 2, 480, `${owner === "p1" ? "PLAYER 1" : "PLAYER 2"} GRAVEYARD\n\nThe Graveyard is empty.`, {
+        color: "#fef3c7", fontSize: "24px", fontStyle: "bold", align: "center",
+      }).setOrigin(0.5).setDepth(32);
+      this.targetModal.push(title);
+      return;
+    }
+
+    const modalHeight = 330;
+    const panel = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 1540, modalHeight, 0x102637)
+      .setStrokeStyle(4, 0xfbbf24)
+      .setDepth(31);
+    const title = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - modalHeight / 2 + 42, `${owner === "p1" ? "PLAYER 1" : "PLAYER 2"} GRAVEYARD`, {
+      color: "#fef3c7",
+      fontSize: "24px",
+      fontStyle: "bold",
+    }).setOrigin(0.5).setDepth(32);
+    this.targetModal.push(panel, title);
+
+    const viewportWidth = 1320;
+    const cardSpacing = 165;
+    const viewportLeft = SCREEN_WIDTH / 2 - viewportWidth / 2;
+    const viewportRight = SCREEN_WIDTH / 2 + viewportWidth / 2;
+    const viewportCenterY = SCREEN_HEIGHT / 2 + 18;
+    const contentWidth = (cards.length - 1) * cardSpacing + 130;
+    const maxOffset = Math.max(0, contentWidth - viewportWidth);
+    const scrollState = { offset: 0, pointerX: undefined };
+    const cardSlots = [];
+
+    cards.forEach((card, index) => {
+      const baseX = viewportLeft + index * cardSpacing + 65;
+      const slot = this.renderGraveyardCard(card, baseX, viewportCenterY);
+      cardSlots.push({ slot, baseX });
+    });
+
+    const updatePositions = () => {
+      cardSlots.forEach(({ slot, baseX }) => {
+        const x = baseX - scrollState.offset;
+        slot.setX(x);
+        slot.setVisible(x > viewportLeft - 65 && x < viewportRight + 65);
+      });
+    };
+    updatePositions();
+
+    const updateScrollOffset = (delta) => {
+      scrollState.offset = Phaser.Math.Clamp(scrollState.offset + delta, 0, maxOffset);
+      updatePositions();
+    };
+
+    const onWheel = (pointer, deltaX, deltaY) => {
+      if (maxOffset === 0) return;
+      if (pointer.x < viewportLeft || pointer.x > viewportRight) return;
+      if (pointer.y < viewportCenterY - 105 || pointer.y > viewportCenterY + 105) return;
+      updateScrollOffset(deltaY !== 0 ? deltaY : deltaX);
+    };
+    const onPointerDown = (pointer) => {
+      if (pointer.x < viewportLeft || pointer.x > viewportRight) return;
+      if (pointer.y < viewportCenterY - 105 || pointer.y > viewportCenterY + 105) return;
+      scrollState.pointerX = pointer.x;
+    };
+    const onPointerMove = (pointer) => {
+      if (!pointer.isDown || scrollState.pointerX === undefined || maxOffset === 0) return;
+      updateScrollOffset(scrollState.pointerX - pointer.x);
+      scrollState.pointerX = pointer.x;
+    };
+    const onPointerUp = () => { scrollState.pointerX = undefined; };
+
+    this.input.on("wheel", onWheel);
+    this.input.on("pointerdown", onPointerDown);
+    this.input.on("pointermove", onPointerMove);
+    this.input.on("pointerup", onPointerUp);
+
+    this.targetModal.push({
+      destroy: () => {
+        this.input.off("wheel", onWheel);
+        this.input.off("pointerdown", onPointerDown);
+        this.input.off("pointermove", onPointerMove);
+        this.input.off("pointerup", onPointerUp);
+      },
+    });
+  }
+
+  renderGraveyardCard(card, x, y) {
+    const texture = CARD_TEXTURES[card.getName()];
+    const children = [];
+    if (texture) {
+      children.push(this.add.image(0, 0, texture).setDisplaySize(130, 182));
+    } else {
+      children.push(this.add.rectangle(0, 0, 130, 182, 0xf1e0a7).setStrokeStyle(2, 0x362b1d));
+      children.push(this.add.text(-54, -68, `${card.getName()}\n\n${card.getDescription()}`, {
+        color: "#1f2937", fontSize: "14px", wordWrap: { width: 108 },
+      }));
+    }
+    const hoverBorder = this.add.rectangle(0, 0, 138, 190, 0x000000, 0)
+      .setStrokeStyle(4, 0xfbbf24)
+      .setVisible(false);
+    const hoverZone = this.add.zone(0, 0, 130, 182).setInteractive();
+    hoverZone.on("pointerover", () => hoverBorder.setVisible(true));
+    hoverZone.on("pointerout", () => hoverBorder.setVisible(false));
+    const slot = this.add.container(x, y, [...children, hoverBorder, hoverZone]).setDepth(33);
+    this.targetModal.push(slot);
+    return slot;
   }
 
   renderOpponentHand(opponent) {
@@ -353,7 +474,7 @@ export class DuelScene extends Phaser.Scene {
     this.scene.restart();
   }
 
-  renderZone(label, x, y, cards, owner) {
+  renderZone(label, x, y, cards, owner, canDirectAttack = false) {
     this.add.text(x, y - 26, label, this.labelStyle(15));
 
     for (let index = 0; index < 5; index++) {
@@ -392,6 +513,32 @@ export class DuelScene extends Phaser.Scene {
       if (card && card.getType() === CARD_TYPES.MONSTER && this.state.phase === DUEL_PHASES.BATTLE) {
         this.addBattleTarget(card, cardX, y, index, owner);
       }
+    }
+
+    if (
+      canDirectAttack
+      && this.state.turn !== 1
+      && cards.length === 0
+      && this.selectedAttackerIndex !== null
+      && this.state[this.state.currentTurnPlayer].monsters[this.selectedAttackerIndex]
+    ) {
+      const directAttackArea = this.add.zone(x + 2.5 * (CARD_WIDTH + CARD_GAP), y + CARD_HEIGHT / 2, 5 * (CARD_WIDTH + CARD_GAP), CARD_HEIGHT)
+        .setInteractive({ useHandCursor: true }).setDepth(5);
+      directAttackArea.on("pointerover", () => this.drawDirectAttackArrow());
+      directAttackArea.on("pointerout", () => {
+        if (this.attackArrow) {
+          this.attackArrow.destroy();
+          this.attackArrow = null;
+        }
+      });
+      directAttackArea.on("pointerdown", () => {
+        this.drawDirectAttackArrow();
+        const result = declareAttack(this.state, this.state.currentTurnPlayer, this.selectedAttackerIndex, null);
+        if (!result.ok) return;
+        this.selectedAttackerIndex = null;
+        this.registry.set("selectedAttackerIndex", null);
+        this.beginTrapResponse(result.event);
+      });
     }
   }
 
@@ -555,8 +702,32 @@ export class DuelScene extends Phaser.Scene {
     this.attackArrow.fillTriangle(targetX, targetY + 70, leftX, leftY + 70, rightX, rightY + 70);
   }
 
+  drawDirectAttackArrow() {
+    if (this.selectedAttackerIndex === null) return;
+    if (this.attackArrow) this.attackArrow.destroy();
+
+    const attackerX = 665 + this.selectedAttackerIndex * (CARD_WIDTH + CARD_GAP) + CARD_WIDTH / 2;
+    const attackerY = 570 + CARD_HEIGHT / 2;
+    const targetX = 975;
+    const targetY = 340;
+    const angle = Phaser.Math.Angle.Between(attackerX, attackerY - 70, targetX, targetY + 70);
+    const arrowLength = 24;
+    const tipX = targetX;
+    const tipY = targetY + 70;
+    const leftX = tipX - arrowLength * Math.cos(angle - Math.PI / 6);
+    const leftY = tipY - arrowLength * Math.sin(angle - Math.PI / 6);
+    const rightX = tipX - arrowLength * Math.cos(angle + Math.PI / 6);
+    const rightY = tipY - arrowLength * Math.sin(angle + Math.PI / 6);
+
+    this.attackArrow = this.add.graphics().setDepth(15);
+    this.attackArrow.lineStyle(8, 0xff3b30, 0.95);
+    this.attackArrow.lineBetween(attackerX, attackerY - 70, tipX, tipY);
+    this.attackArrow.fillStyle(0xff3b30, 1);
+    this.attackArrow.fillTriangle(tipX, tipY, leftX, leftY, rightX, rightY);
+  }
+
   renderHand(player) {
-    const cards = player.hand.slice(0, 5);
+    const cards = player.hand;
     const startX = 665;
     const y = 925;
     this.add.text(startX, y - 25, "YOUR HAND", this.labelStyle(16));
@@ -731,9 +902,7 @@ export class DuelScene extends Phaser.Scene {
       return;
     }
 
-    const columns = Math.min(targets.length, 5);
-    const rows = Math.ceil(targets.length / columns);
-    const modalHeight = 110 + rows * 220;
+    const modalHeight = 330;
     const panel = this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 1540, modalHeight, 0x102637)
       .setStrokeStyle(4, 0xfbbf24)
       .setDepth(31);
@@ -744,42 +913,95 @@ export class DuelScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(32);
     this.targetModal.push(panel, title);
 
+    const viewportWidth = 1330;
+    const cardSpacing = 165;
+    const viewportLeft = SCREEN_WIDTH / 2 - viewportWidth / 2;
+    const viewportRight = SCREEN_WIDTH / 2 + viewportWidth / 2;
+    const viewportCenterY = SCREEN_HEIGHT / 2 + 18;
+    const contentWidth = (targets.length - 1) * cardSpacing + 130;
+    const maxOffset = Math.max(0, contentWidth - viewportWidth);
+    const scrollState = { offset: 0, pointerX: undefined, startPointerX: undefined };
+    const cardSlots = [];
+
     targets.forEach(({ card, owner, graveyardIndex }, index) => {
-      const row = Math.floor(index / columns);
-      const column = index % columns;
-      const cardX = SCREEN_WIDTH / 2 - ((columns - 1) * 165) / 2 + column * 165;
-      const cardY = SCREEN_HEIGHT / 2 - modalHeight / 2 + 165 + row * 220;
-      this.renderMonsterRebornTarget(card, cardX, cardY, () => {
+      const baseX = viewportLeft + index * cardSpacing + 65;
+      const slot = this.renderMonsterRebornTarget(card, baseX, viewportCenterY, () => {
+        if (scrollState.startPointerX !== undefined && Math.abs(scrollState.pointerX - scrollState.startPointerX) > 6) return;
         onSelect({ player: owner, graveyardIndex });
       });
+      cardSlots.push({ slot, baseX });
+    });
+
+    const updatePositions = () => {
+      cardSlots.forEach(({ slot, baseX }) => {
+        const x = baseX - scrollState.offset;
+        slot.setX(x);
+        slot.setVisible(x > viewportLeft - 65 && x < viewportRight + 65);
+      });
+    };
+    updatePositions();
+
+    const onWheelReborn = (pointer, deltaX, deltaY) => {
+      if (maxOffset === 0) return;
+      if (pointer.x < viewportLeft || pointer.x > viewportRight) return;
+      if (pointer.y < viewportCenterY - 105 || pointer.y > viewportCenterY + 105) return;
+      scrollState.offset = Phaser.Math.Clamp(scrollState.offset + (deltaY !== 0 ? deltaY : deltaX), 0, maxOffset);
+      updatePositions();
+    };
+    const onPointerDownReborn = (pointer) => {
+      if (pointer.x < viewportLeft || pointer.x > viewportRight) return;
+      if (pointer.y < viewportCenterY - 105 || pointer.y > viewportCenterY + 105) return;
+      scrollState.pointerX = pointer.x;
+      scrollState.startPointerX = pointer.x;
+    };
+    const onPointerMoveReborn = (pointer) => {
+      if (!pointer.isDown || scrollState.pointerX === undefined || maxOffset === 0) return;
+      scrollState.offset = Phaser.Math.Clamp(scrollState.offset + (scrollState.pointerX - pointer.x), 0, maxOffset);
+      updatePositions();
+      scrollState.pointerX = pointer.x;
+    };
+    const onPointerUpReborn = () => { scrollState.pointerX = undefined; scrollState.startPointerX = undefined; };
+
+    this.input.on("wheel", onWheelReborn);
+    this.input.on("pointerdown", onPointerDownReborn);
+    this.input.on("pointermove", onPointerMoveReborn);
+    this.input.on("pointerup", onPointerUpReborn);
+
+    this.targetModal.push({
+      destroy: () => {
+        this.input.off("wheel", onWheelReborn);
+        this.input.off("pointerdown", onPointerDownReborn);
+        this.input.off("pointermove", onPointerMoveReborn);
+        this.input.off("pointerup", onPointerUpReborn);
+      },
     });
   }
 
   renderMonsterRebornTarget(card, x, y, onSelect) {
     const texture = CARD_TEXTURES[card.getName()];
-    const cardObjects = [];
+    const children = [];
 
     if (texture) {
-      cardObjects.push(this.add.image(x, y, texture).setDisplaySize(130, 182));
+      children.push(this.add.image(0, 0, texture).setDisplaySize(130, 182));
     } else {
-      cardObjects.push(this.add.rectangle(x, y, 130, 182, 0xf1e0a7).setStrokeStyle(3, 0x362b1d));
-      cardObjects.push(this.add.text(x - 54, y - 68, `${card.getName()}\n\nATK ${card.getAtk()} / DEF ${card.getDef()}`, {
+      children.push(this.add.rectangle(0, 0, 130, 182, 0xf1e0a7).setStrokeStyle(3, 0x362b1d));
+      children.push(this.add.text(-54, -68, `${card.getName()}\n\nATK ${card.getAtk()} / DEF ${card.getDef()}`, {
         color: "#1f2937",
         fontSize: "14px",
         wordWrap: { width: 108 },
       }));
     }
 
-    cardObjects.forEach((cardObject) => cardObject.setDepth(32));
-    const hoverBorder = this.add.rectangle(x, y, 138, 190, 0x000000, 0)
+    const hoverBorder = this.add.rectangle(0, 0, 138, 190, 0x000000, 0)
       .setStrokeStyle(4, 0xfbbf24)
-      .setVisible(false)
-      .setDepth(32);
-    const targetArea = this.add.zone(x, y, 130, 182).setInteractive({ useHandCursor: true }).setDepth(33);
+      .setVisible(false);
+    const targetArea = this.add.zone(0, 0, 130, 182).setInteractive({ useHandCursor: true });
     targetArea.on("pointerdown", onSelect);
     targetArea.on("pointerover", () => hoverBorder.setVisible(true));
     targetArea.on("pointerout", () => hoverBorder.setVisible(false));
-    this.targetModal.push(...cardObjects, hoverBorder, targetArea);
+    const slot = this.add.container(x, y, [...children, hoverBorder, targetArea]).setDepth(33);
+    this.targetModal.push(slot);
+    return slot;
   }
 
   showTrapResponseModal(player, traps, onPass, onSelect) {

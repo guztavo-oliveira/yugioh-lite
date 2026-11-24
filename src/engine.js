@@ -140,6 +140,7 @@ export function advancePhase(state) {
   if (phaseIndex === DUEL_PHASES_FLOW.length - 2) {
     const player = state.currentTurnPlayer;
     state[player].normalSummoned = false;
+    state[getOpponent(player)].monsters.forEach((monster) => monster.resetAttack());
     state.phase = DUEL_PHASES_FLOW[0];
     state.currentTurnPlayer = getOpponent(player);
     state.turn++;
@@ -391,10 +392,13 @@ export function resolveTrap(state, player, supportIndex, event) {
 export function declareAttack(state, player, attackerIndex, targetIndex) {
   const opponent = getOpponent(player);
   const attacker = state[player].monsters[attackerIndex];
-  const target = state[opponent].monsters[targetIndex];
+  const target = targetIndex === null ? null : state[opponent].monsters[targetIndex];
 
-  if (!attacker || !target) {
+  if (!attacker || (targetIndex !== null && !target)) {
     return { ok: false, message: "Choose a valid attacking monster and target." };
+  }
+  if (targetIndex === null && state[opponent].monsters.length > 0) {
+    return { ok: false, message: "Direct attacks are only allowed when the opponent has no monsters." };
   }
   if (attacker.getAlreadyAttacked()) {
     return { ok: false, message: "This monster already attacked this turn." };
@@ -423,10 +427,15 @@ export function resolveBattle(state, event) {
   const attackerIndex = getMonsterIndex(state, player, event.attacker);
   const targetIndex = getMonsterIndex(state, opponent, event.target);
   const attacker = state[player].monsters[attackerIndex];
-  const target = state[opponent].monsters[targetIndex];
+  const target = event.target ? state[opponent].monsters[targetIndex] : null;
 
-  if (!attacker || !target) {
+  if (!attacker || (event.target && !target)) {
     return { ok: false, message: "The attack can no longer be resolved." };
+  }
+
+  if (!target) {
+    state[opponent].lp -= attacker.getAtk();
+    return completeBattle(state, `${attacker.getName()} attacked directly for ${attacker.getAtk()} damage.`);
   }
 
   if (target.getPosition() === POSITIONS.ATTACK) {
