@@ -222,12 +222,22 @@ export class DuelScene extends Phaser.Scene {
 
   renderPiles(opponent, player) {
     this.renderPile("OPPONENT DECK", 1445, 250, this.state[opponent].deck.length);
-    this.renderPile("OPPONENT GRAVE", 1445, 445, this.state[opponent].graveyard.length, () => {
-      this.showGraveyardModal(opponent);
-    });
-    this.renderPile("YOUR GRAVE", 1445, 650, this.state[player].graveyard.length, () => {
-      this.showGraveyardModal(player);
-    });
+    this.renderPile(
+      "OPPONENT GRAVE",
+      1445,
+      445,
+      this.state[opponent].graveyard.length,
+      () => this.showGraveyardModal(opponent),
+      this.state[opponent].graveyard.at(-1),
+    );
+    this.renderPile(
+      "YOUR GRAVE",
+      1445,
+      650,
+      this.state[player].graveyard.length,
+      () => this.showGraveyardModal(player),
+      this.state[player].graveyard.at(-1),
+    );
     this.renderPile("YOUR DECK", 1445, 845, this.state[player].deck.length);
   }
 
@@ -292,10 +302,17 @@ export class DuelScene extends Phaser.Scene {
     }));
   }
 
-  renderPile(label, x, y, count) {
+  renderPile(label, x, y, count, onClick = null, topCard = null) {
     const pile = this.add.container(x, y);
     pile.add(this.add.rectangle(0, 0, 126, 166, 0x0b1f2c).setStrokeStyle(3, 0x8aa5b5));
-    pile.add(this.add.image(0, -9, "card-back").setDisplaySize(78, 108));
+
+    const topCardTexture = topCard ? CARD_TEXTURES[topCard.getName()] : null;
+    if (topCardTexture) {
+      pile.add(this.add.image(0, -9, topCardTexture).setDisplaySize(78, 108));
+    } else {
+      pile.add(this.add.image(0, -9, "card-back").setDisplaySize(78, 108));
+    }
+
     pile.add(this.add.text(0, 65, `${label}\n${count}`, {
       color: "#f8fafc",
       fontSize: "12px",
@@ -303,8 +320,9 @@ export class DuelScene extends Phaser.Scene {
       align: "center",
     }).setOrigin(0.5));
     if (label.includes("GRAVE")) {
+      const clickHandler = onClick || (() => this.showGraveyardModal(label.startsWith("YOUR") ? this.state.currentTurnPlayer : getOpponent(this.state.currentTurnPlayer)));
       pile.setInteractive(new Phaser.Geom.Rectangle(-63, -83, 126, 166), Phaser.Geom.Rectangle.Contains)
-        .on("pointerdown", () => this.showGraveyardModal(label.startsWith("YOUR") ? this.state.currentTurnPlayer : getOpponent(this.state.currentTurnPlayer)));
+        .on("pointerdown", clickHandler);
     }
   }
 
