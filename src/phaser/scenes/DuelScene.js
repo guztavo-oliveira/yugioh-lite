@@ -56,7 +56,7 @@ export class DuelScene extends Phaser.Scene {
     this.actionMenu = [];
     this.targetModal = [];
     this.responseModal = [];
-    this.selectedCardPreview = null;
+    this.selectedCardPreview = this.registry.get("selectedCardPreview") ?? null;
     this.selectedAttackerIndex = this.registry.get("selectedAttackerIndex") ?? null;
     this.attackArrow = null;
     this.add.rectangle(SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT, 0x07141d);
@@ -214,52 +214,55 @@ export class DuelScene extends Phaser.Scene {
   }
 
   renderPlaymat() {
-    this.add.rectangle(975, 515, 1150, 900, 0x153447).setStrokeStyle(5, 0x8aa5b5);
-    this.add.image(975, 515, "playmat")
-      .setDisplaySize(1140, 890)
+    this.add.rectangle(1050, 515, 1000, 900, 0x153447).setStrokeStyle(5, 0x8aa5b5);
+    this.add.image(1050, 515, "playmat")
+      .setDisplaySize(990, 890)
       .setTint(0x4d6f82)
       .setAlpha(0.18);
-    this.add.rectangle(975, 525, 960, 8, 0xd5b362, 0.7);
+    this.add.rectangle(1050, 525, 960, 8, 0xd5b362, 0.7);
     this.add.text(975, 94, "OPPONENT FIELD", this.labelStyle(18)).setOrigin(0.5);
     this.add.text(975, 920, "YOUR FIELD", this.labelStyle(18)).setOrigin(0.5);
   }
 
   renderPlayerPanel(opponent, player, turn, phase) {
-    this.add.rectangle(200, 515, 330, 900, 0x102637).setStrokeStyle(4, 0x8aa5b5);
-    this.add.text(200, 115, "DUEL STATUS", this.labelStyle(26)).setOrigin(0.5);
-    this.add.line(45, 150, 25, 0, 305, 0, 0x8aa5b5, 0.8);
+    this.add.rectangle(1710, 259, 360, 390, 0x102637).setStrokeStyle(3, 0x8aa5b5);
 
-    this.add.text(65, 185, "OPPONENT", this.labelStyle(20));
-    this.add.text(65, 225, `LP  ${this.state[opponent].lp}`, this.labelStyle(30));
-    this.add.text(65, 275, `Deck: ${this.state[opponent].deck.length}`, this.labelStyle(18));
-    this.add.text(65, 305, `Graveyard: ${this.state[opponent].graveyard.length}`, this.labelStyle(18));
+    // Opponent status
+    this.add.text(1545, 82, "OPPONENT", this.labelStyle(16));
+    this.add.text(1545, 108, `LP  ${this.state[opponent].lp}`, this.labelStyle(24));
 
-    this.add.line(45, 445, 25, 0, 305, 0, 0x8aa5b5, 0.8);
-    this.add.text(65, 485, "YOUR TURN", this.labelStyle(20));
-    this.add.text(65, 525, `LP  ${this.state[player].lp}`, this.labelStyle(30));
-    this.add.text(65, 575, `Deck: ${this.state[player].deck.length}`, this.labelStyle(18));
-    this.add.text(65, 605, `Graveyard: ${this.state[player].graveyard.length}`, this.labelStyle(18));
+    this.add.line(1545, 150, 0, 0, 330, 0, 0x8aa5b5, 0.6).setOrigin(0, 0);
 
-    this.add.line(45, 735, 25, 0, 305, 0, 0x8aa5b5, 0.8);
-    this.add.text(65, 775, `TURN ${turn}`, this.labelStyle(22));
-    this.add.text(65, 815, `PHASE: ${phase.replace("_", " ")}`, this.labelStyle(18));
+    // Player status
+    this.add.text(1545, 168, "YOUR TURN", this.labelStyle(16));
+    this.add.text(1545, 194, `LP  ${this.state[player].lp}`, this.labelStyle(24));
+
+    this.add.line(1545, 236, 0, 0, 330, 0, 0x8aa5b5, 0.6).setOrigin(0, 0);
+
+    // Turn & Phase
+    this.add.text(1545, 254, `TURN ${turn}`, this.labelStyle(18));
+    this.add.text(1545, 282, `PHASE: ${phase.replace("_", " ")}`, this.labelStyle(15));
+
     this.addRestartDuelButton();
   }
 
   addRestartDuelButton() {
-    const x = 200;
-    const y = 870;
-    const button = this.add.rectangle(x, y, 235, 48, 0x991b1b)
-      .setStrokeStyle(3, 0xfef3c7)
+    const x = 1710;
+    const y = 390;
+    const button = this.add.rectangle(x, y, 260, 42, 0x991b1b)
+      .setStrokeStyle(2, 0xfef3c7)
       .setInteractive({ useHandCursor: true });
     const text = this.add.text(x, y, "RESTART DUEL", {
       color: "#fef3c7",
-      fontSize: "18px",
+      fontSize: "16px",
       fontStyle: "bold",
     }).setOrigin(0.5);
 
     button.on("pointerdown", () => this.restartDuel());
     text.setInteractive({ useHandCursor: true }).on("pointerdown", () => this.restartDuel());
+
+    button.on("pointerover", () => button.setFillStyle(0xb91c1c));
+    button.on("pointerout", () => button.setFillStyle(0x991b1b));
   }
 
   restartDuel() {
@@ -270,15 +273,16 @@ export class DuelScene extends Phaser.Scene {
     this.registry.set("selectedAttackerIndex", null);
     this.registry.set("pendingTrapResponse", null);
     this.registry.set("pendingTrapResolution", null);
+    this.registry.set("selectedCardPreview", null);
     this.scene.restart();
   }
 
   renderPiles(opponent, player) {
-    this.renderPile("OPPONENT DECK", 1445, 250, this.state[opponent].deck.length);
+    this.renderPile("OPPONENT DECK", 1445, 205, this.state[opponent].deck.length);
     this.renderPile(
       "OPPONENT GRAVE",
       1445,
-      445,
+      400,
       this.state[opponent].graveyard.length,
       () => this.showGraveyardModal(opponent),
       this.state[opponent].graveyard.at(-1),
@@ -315,14 +319,19 @@ export class DuelScene extends Phaser.Scene {
       this.cardPreviewObjects.push(object);
       return object;
     };
-    addPreviewObject(this.add.rectangle(1710, 259, 360, 390, 0x102637).setStrokeStyle(3, 0x8aa5b5));
-    addPreviewObject(this.add.text(1710, 90, "CARD DETAILS", this.labelStyle(20)).setOrigin(0.5));
+
+    // Left panel: x: 285, y: 515, width: 480, height: 900 (spans x: 45 to x: 525)
+    const panelCenterX = 285;
+    const panelWidth = 480;
+    const panelHeight = 900;
+    addPreviewObject(this.add.rectangle(panelCenterX, 515, panelWidth, panelHeight, 0x102637).setStrokeStyle(4, 0x8aa5b5));
+
     if (!selection) {
-      addPreviewObject(this.add.text(1710, 250, "Mouse hover one of your cards to view its details.", {
+      addPreviewObject(this.add.text(panelCenterX, 515, "Hover over a card to view its details.", {
         color: "#cbd5e1",
-        fontSize: "15px",
+        fontSize: "20px",
         align: "center",
-        wordWrap: { width: 300 },
+        wordWrap: { width: 380 },
       }).setOrigin(0.5));
       return;
     }
@@ -330,28 +339,83 @@ export class DuelScene extends Phaser.Scene {
     const { card, owner } = selection;
     const isHiddenFromViewer = card.getVisibility() === VISIBILITY.FACE_DOWN
       && owner !== this.state.currentTurnPlayer;
+
+    // Panel is at y = 515, height = 900 (spans y = 65 to y = 965).
+    // Card with size 380x532: top edge at y = 84, bottom edge at y = 616 (well within y = 65).
+    const cardWidth = 380;
+    const cardHeight = 532;
+    const cardCenterX = panelCenterX;
+    const cardCenterY = 350;
+
+    // Description box below card: spans y = 635 to y = 955 (height: 320, center: 795).
+    const descBoxY = 795;
+    const descBoxHeight = 320;
+    const descBoxWidth = 450;
+
     if (isHiddenFromViewer) {
-      addPreviewObject(this.add.image(1585, 275, "card-back").setDisplaySize(90, 126));
-      addPreviewObject(this.add.text(1650, 225, "Face-down card", {
+      addPreviewObject(this.add.image(cardCenterX, cardCenterY, "card-back").setDisplaySize(cardWidth, cardHeight));
+      // Description box below card
+      addPreviewObject(this.add.rectangle(panelCenterX, descBoxY, descBoxWidth, descBoxHeight, 0x0a1924).setStrokeStyle(2, 0x8aa5b5));
+      addPreviewObject(this.add.text(panelCenterX, descBoxY - 80, "Face-Down Card", {
+        color: "#fbbf24",
+        fontSize: "22px",
+        fontStyle: "bold",
+      }).setOrigin(0.5));
+      addPreviewObject(this.add.text(panelCenterX - descBoxWidth / 2 + 25, descBoxY - 20, "This card is face-down on the opponent's field.", {
         color: "#f8fafc",
-        fontSize: "16px",
-        wordWrap: { width: 220 },
+        fontSize: "17px",
+        wordWrap: { width: descBoxWidth - 50 },
       }));
       return;
     }
 
     const texture = CARD_TEXTURES[card.getName()];
     if (texture) {
-      addPreviewObject(this.add.image(1585, 285, texture).setDisplaySize(100, 140));
+      addPreviewObject(this.add.image(cardCenterX, cardCenterY, texture).setDisplaySize(cardWidth, cardHeight));
+    } else {
+      addPreviewObject(this.add.rectangle(cardCenterX, cardCenterY, cardWidth, cardHeight, 0xf1e0a7).setStrokeStyle(3, 0x362b1d));
+      addPreviewObject(this.add.text(cardCenterX, cardCenterY, card.getName(), {
+        color: "#1f2937",
+        fontSize: "24px",
+        fontStyle: "bold",
+        align: "center",
+        wordWrap: { width: cardWidth - 30 },
+      }).setOrigin(0.5));
     }
-    const description = [card.getName(), card.getDescription()];
+
+    // Description box below the card
+    addPreviewObject(this.add.rectangle(panelCenterX, descBoxY, descBoxWidth, descBoxHeight, 0x0a1924).setStrokeStyle(2, 0x8aa5b5));
+
+    const contentLeft = panelCenterX - descBoxWidth / 2 + 20;
+
+    // Card Name
+    addPreviewObject(this.add.text(contentLeft, descBoxY - descBoxHeight / 2 + 16, card.getName(), {
+      color: "#fef3c7",
+      fontSize: "21px",
+      fontStyle: "bold",
+      wordWrap: { width: descBoxWidth - 40 },
+    }));
+
+    // Card Subtitle (Type & ATK/DEF)
+    let statsText = `[${card.getType()}]`;
     if (card.getType() === CARD_TYPES.MONSTER) {
-      description.push(`ATK ${card.getAtk()} / DEF ${card.getDef()}`);
+      statsText += `   ATK ${card.getAtk()} / DEF ${card.getDef()}`;
     }
-    addPreviewObject(this.add.text(texture ? 1650 : 1555, 220, description.join("\n\n"), {
+    addPreviewObject(this.add.text(contentLeft, descBoxY - descBoxHeight / 2 + 50, statsText, {
+      color: "#fbbf24",
+      fontSize: "16px",
+      fontStyle: "bold",
+    }));
+
+    // Divider line
+    addPreviewObject(this.add.line(contentLeft - 5, descBoxY - descBoxHeight / 2 + 76, 0, 0, descBoxWidth - 30, 0, 0x8aa5b5, 0.5).setOrigin(0, 0));
+
+    // Description / Effect text
+    addPreviewObject(this.add.text(contentLeft, descBoxY - descBoxHeight / 2 + 88, card.getDescription() || "No effect text.", {
       color: "#f8fafc",
       fontSize: "15px",
-      wordWrap: { width: texture ? 220 : 310 },
+      lineSpacing: 4,
+      wordWrap: { width: descBoxWidth - 40 },
     }));
   }
 
@@ -685,13 +749,12 @@ export class DuelScene extends Phaser.Scene {
   setCardPreview(card, owner) {
     if (this.selectedCardPreview?.card === card) return;
     this.selectedCardPreview = { card, owner };
+    this.registry.set("selectedCardPreview", this.selectedCardPreview);
     this.renderCardPreview();
   }
 
   clearCardPreview() {
-    if (!this.selectedCardPreview) return;
-    this.selectedCardPreview = null;
-    this.renderCardPreview();
+    // Keep the last card previewed until the next card preview
   }
 
   addBattleTarget(card, x, y, index, owner) {
@@ -755,9 +818,9 @@ export class DuelScene extends Phaser.Scene {
   drawAttackArrow(targetIndex) {
     if (this.attackArrow) this.attackArrow.destroy();
 
-    const attackerX = 665 + this.selectedAttackerIndex * (CARD_WIDTH + CARD_GAP) + CARD_WIDTH / 2;
+    const attackerX = 615 + this.selectedAttackerIndex * (CARD_WIDTH + CARD_GAP) + CARD_WIDTH / 2;
     const attackerY = 570 + CARD_HEIGHT / 2;
-    const targetX = 665 + targetIndex * (CARD_WIDTH + CARD_GAP) + CARD_WIDTH / 2;
+    const targetX = 615 + targetIndex * (CARD_WIDTH + CARD_GAP) + CARD_WIDTH / 2;
     const targetY = 340 + CARD_HEIGHT / 2;
     const angle = Phaser.Math.Angle.Between(attackerX, attackerY, targetX, targetY);
     const arrowLength = 24;
@@ -777,7 +840,7 @@ export class DuelScene extends Phaser.Scene {
     if (this.selectedAttackerIndex === null) return;
     if (this.attackArrow) this.attackArrow.destroy();
 
-    const attackerX = 665 + this.selectedAttackerIndex * (CARD_WIDTH + CARD_GAP) + CARD_WIDTH / 2;
+    const attackerX = 615 + this.selectedAttackerIndex * (CARD_WIDTH + CARD_GAP) + CARD_WIDTH / 2;
     const attackerY = 570 + CARD_HEIGHT / 2;
     const targetX = 975;
     const targetY = 340;
@@ -799,7 +862,7 @@ export class DuelScene extends Phaser.Scene {
 
   renderHand(player) {
     const cards = player.hand;
-    const startX = 665;
+    const startX = 615;
     const y = 925;
     this.add.text(startX, y - 25, "YOUR HAND", this.labelStyle(16));
     cards.forEach((card, index) => {
