@@ -464,6 +464,11 @@ export function resolveBattle(state, event) {
     return { ok: false, message: "The attack can no longer be resolved." };
   }
 
+  if (target && target.getVisibility() === VISIBILITY.FACE_DOWN) {
+    target.setVisibility(VISIBILITY.FACE_UP);
+    addGameLog(state, `${target.getName()} was flipped face-up.`);
+  }
+
   if (!target) {
     state[opponent].lp -= attacker.getAtk();
     return completeBattle(state, `${attacker.getName()} attacked directly for ${attacker.getAtk()} damage.`);
