@@ -61,6 +61,7 @@ const CARD_TEXTURES = {
   "Darkfire Soldier #1": "darkfire_soldier_1",
   "Feral Imp": "feral_imp",
   "Mystic Elf": "mystical_elf",
+  "Celtic Guardian": "celtic_guardian",
   "Dark Hole": "dark_hole",
   "Monster Reborn": "monster_reborn",
   "Raigeki": "raigeki",

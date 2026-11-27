@@ -20,6 +20,7 @@ export class BootScene extends Phaser.Scene {
     this.load.image("mirror_force", assetUrl("mirror_force.jpg"));
     this.load.image("monster_reborn", assetUrl("monster_reborn.jpg"));
     this.load.image("mystical_elf", assetUrl("mystical_elf.jpg"));
+    this.load.image("celtic_guardian", assetUrl("celtic_guardian.jpg"));
     this.load.image("pot_of_greed", assetUrl("pot_of_greed.jpg"));
     this.load.image("raigeki", assetUrl("raigeki.jpg"));
     this.load.image("summoned_skull", assetUrl("summoned_skull.jpg"));

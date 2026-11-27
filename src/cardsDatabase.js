@@ -79,6 +79,17 @@ export const CARD_DATABASE = {
     imgKey: "mystical_elf"
   },
 
+  "c016": {
+    id: "c016",
+    name: "Celtic Guardian",
+    type: "MONSTER",
+    atk: 1400,
+    def: 1200,
+    level: 4,
+    description: "A guardian with a sword, clad in Celtic armor.",
+    imgKey: "celtic_guardian"
+  },
+
   // ===== SPELLS =====
 
   "c003": {

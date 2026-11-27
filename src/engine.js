@@ -20,12 +20,12 @@ export function createGameState() {
     log: [],
     p1: {
       lp: 8000,
-      deck: ["c001", "c002", "c003", "c006", "c007", "c008", "c009", "c010", "c011", "c012", "c013", "c014", "c015"],
+      deck: ["c001", "c002", "c003", "c006", "c007", "c008", "c009", "c010", "c011", "c012", "c013", "c014", "c015", "c016"],
       hand: [], monsters: [], supports: [], graveyard: [], normalSummoned: false,
     },
     p2: {
       lp: 8000,
-      deck: ["c005", "c004", "c003", "c006", "c007", "c008", "c009", "c010", "c011", "c012", "c013", "c014", "c015"],
+      deck: ["c005", "c004", "c003", "c006", "c007", "c008", "c009", "c010", "c011", "c012", "c013", "c014", "c015", "c016"],
       hand: [], monsters: [], supports: [], graveyard: [], normalSummoned: false,
     },
   };
