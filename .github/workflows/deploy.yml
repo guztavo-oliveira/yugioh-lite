@@ -16,7 +16,7 @@ permissions:
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
 concurrency:
   group: "pages"
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build-and-deploy:
@@ -31,7 +31,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: "npm"
 
       - name: Install dependencies
@@ -47,6 +47,7 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: "./dist"
+          name: github-pages-${{ github.run_id }}
 
       - name: Deploy to GitHub Pages
         id: deployment
